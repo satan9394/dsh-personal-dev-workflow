@@ -16,17 +16,23 @@ v3 已去冗余：147 行 → **67 行**，每行规则都有出处。
 - **依据扎实**：融合 OpenAI Codex（harness engineering / Symphony）、Anthropic（Claude Code 最佳实践）
   与 DeepSeek Harness 实测；对照表见 `references/framework.md`。
 
+## 中英文双版本
+
+- **English（默认）**：`SKILL.md` + `references/` —— 市面默认语言。
+- **中文版**：`SKILL.zh-CN.md` + `references.zh-CN/` —— 同名变体，正文与模板均为中文。
+- 任选一版使用：把 `SKILL.md`（或 `SKILL.zh-CN.md` 改名为 `SKILL.md`）连同对应 `references/` 复制到
+  目标工作区的 `.dsh/skills/personal-dev-workflow/`（DSH）或 `~/.claude/skills/personal-dev-workflow/`（Claude Code）。
+- 插件形态内置两个 skill：`personal-dev-workflow`（英文）与 `personal-dev-workflow-zh`（中文），安装后自选。
+
 ## 结构
 
 ```
 dsh-personal-dev-workflow/
-├── SKILL.md                       # v3 主文件（正文 67 行）
-├── references/
-│   ├── framework.md               # 可选背景：五组件/出处/成本数字/公司做法对照
-│   ├── task-card-template.md      # 任务卡模板
-│   ├── spec-template.md           # SPEC 模板（Not Doing / 关键假设）
-│   └── verify-checklist.md        # 验证清单（Review 五件事 / 熔断）
-└── plugin/dsh-personal-dev-workflow/   # DSH bundle 插件（含同一份 skill）
+├── SKILL.md                       # v3 英文主版（正文 67 行）
+├── SKILL.zh-CN.md                 # 中文变体
+├── references/                    # 英文模板（framework / task-card / spec / verify-checklist）
+├── references.zh-CN/              # 中文模板
+└── plugin/dsh-personal-dev-workflow/   # DSH bundle 插件（含 en + zh 两个 skill）
 ```
 
 ## 安装与使用

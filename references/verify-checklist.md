@@ -1,36 +1,36 @@
-# 验证清单（每张任务卡完成后对照）
+# Verification Checklist (run after each task card)
 
-## 完成判定（客观门禁，不是"agent 觉得行"）
-- [ ] 验收标准逐条可执行验证（命令/测试/截图），非口头确认
+## Completion decision (objective gates, not "the agent feels done")
+- [ ] Acceptance criteria verified one by one with executable evidence (commands / tests / screenshots), not verbal confirmation
 
-## 基础验证（每张卡必做）
-- [ ] 语法/类型检查通过（如 node --check / tsc）
-- [ ] 相关测试通过（npm test / pytest / 对应框架）
-- [ ] 构建/打包通过（如 npm run build）
+## Baseline (every card)
+- [ ] Syntax / type check passes (e.g., `node --check` / `tsc`)
+- [ ] Related tests pass (`npm test` / `pytest` / whatever the stack uses)
+- [ ] Build / bundle passes (e.g., `npm run build`)
 
-## Review 五件事（默认怀疑：假设代码是坏的，除非被证明能跑）
-- [ ] 超范围改动（是否动了任务卡限制条件禁止的东西）
-- [ ] 改错文件（是否动错文件/模块）
-- [ ] 接口兼容（对外接口是否被破坏）
-- [ ] 异常处理（错误路径/边界是否处理）
-- [ ] 可维护性（命名/结构/注释是否合格）
+## Review five things (default suspicion: assume the code is broken until proven to run)
+- [ ] Out-of-scope changes (did it touch anything the card's constraints forbade?)
+- [ ] Wrong files (did it modify the wrong file / module?)
+- [ ] Interface compatibility (is any external interface broken?)
+- [ ] Error handling (are error paths / edge cases handled?)
+- [ ] Maintainability (naming / structure / comments acceptable?)
 
-## 功能验证
-- [ ] 核心流程按验收标准逐条核对
-- [ ] 边界情况（空值/异常/大输入）不崩
+## Functional verification
+- [ ] Core flow checked against each acceptance criterion
+- [ ] Edge cases (empty / abnormal / large input) don't crash
 
-## 对抗性评审（大改动另派评审子代理）
-- [ ] 评审子代理用全新上下文，只见 diff 和验收标准
-- [ ] 反向挑错：遗漏分支、不一致、安全隐患、性能问题
+## Adversarial review (large changes: dispatch a reviewer subagent)
+- [ ] Reviewer gets a fresh context and sees only the diff and the acceptance criteria
+- [ ] It looks for: missed branches, inconsistencies, security issues, performance problems
 
-## UI 验证（如涉及前端）
-- [ ] 浏览器截图核对布局（无溢出/重叠）
-- [ ] 响应式（桌面/平板/手机）
+## UI verification (if frontend is involved)
+- [ ] Browser screenshot checked for layout (no overflow / overlap)
+- [ ] Responsive (desktop / tablet / mobile)
 
-## 熔断检查
-- [ ] 同一问题未超过 3 次修复循环（超过：停止重来，清空上下文重新派活或换执行器）
+## Circuit breaker
+- [ ] No problem survived more than 3 fix attempts (if it did: stop, clear the context, re-dispatch or switch executors)
 
-## 收尾
-- [ ] 踩坑/教训已写进 AGENTS.md（「别这样做」）
-- [ ] 决策已写进 docs/
-- [ ] 任务卡状态已更新，用户已验收
+## Wrap-up
+- [ ] Lessons / pitfalls written into AGENTS.md ("don't do this")
+- [ ] Decisions written into docs/
+- [ ] Card status updated; user has accepted

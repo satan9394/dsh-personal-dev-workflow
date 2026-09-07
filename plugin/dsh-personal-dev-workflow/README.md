@@ -21,6 +21,10 @@ dsh plugin --profile web add link:<本仓库路径>
 对 agent 说"开工 / 拆任务卡 / 实现这个功能 / 修这个 bug"，`personal-dev-workflow` 技能会按
 六步循环推进：拆卡落盘 `tasks/` → 每张卡一个隔离执行器 → 交证 → 验证 → 你拍板 → 复盘。
 
+插件内置两个 skill：
+- `personal-dev-workflow` —— 英文版（默认）
+- `personal-dev-workflow-zh` —— 中文版（正文与模板为中文，description 用中文触发词）
+
 ## 结构
 
 ```

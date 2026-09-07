@@ -1,40 +1,40 @@
-# 任务卡模板（复制到 tasks/NNN-xxx.md）
+# Task Card Template (copy to tasks/NNN-name.md)
 
 ```markdown
-# [任务标题]
+# [Task title]
 
-- 状态：待执行（待执行 / 执行中 / 待验收 / 已合入 / 打回）
-- 优先级：P0/P1/P2
-- 创建日期：YYYY-MM-DD
-- 关联卡片：（可选）
+- Status: todo (todo / in_progress / in_review / merged / rejected)
+- Priority: P0/P1/P2
+- Created: YYYY-MM-DD
+- Related cards: (optional)
 
-## 目标
-（一句话说清这张卡要交付什么）
+## Goal
+(One sentence: what this card delivers)
 
-## 限制条件 / 禁止事项（必填，最关键）
-- （不能改什么：文件/模块/接口/约定）
-- （外部副作用默认不授权：发送/发布/删除）
+## Constraints / Do-nots (REQUIRED, most important)
+- (What must NOT be changed: files / modules / interfaces / conventions)
+- (External side effects are not authorized by default: send / publish / delete)
 
-## 验收标准（客观门禁，可执行）
-- [ ] （可执行、可验证的标准 1）
-- [ ] （标准 2，如：运行 npm test 全部通过）
-- [ ] （标准 3，如：页面截图无明显溢出）
+## Acceptance criteria (objective gates, executable)
+- [ ] (Executable, verifiable criterion 1)
+- [ ] (Criterion 2, e.g., `npm test` passes)
+- [ ] (Criterion 3, e.g., screenshot shows no overflow)
 
-## 涉及文件（含影响面：调用者/测试/接口/配置入口）
+## Files involved (incl. blast radius: callers / tests / interfaces / config entry points)
 - `src/...`
 - `docs/...`
 
-## 依赖
-- 依赖任务卡：tasks/NNN-xxx.md
-- 阻塞于：—
+## Dependencies
+- Depends on: tasks/NNN-name.md
+- Blocked by: —
 
-## 预期证据（执行器回填）
-- [ ] 改动摘要（改了什么、为什么——说不清改了什么，代码不要直接信）
-- [ ] diff 已提供
-- [ ] 测试结果已提供
-- [ ] 截图/演示已提供
+## Expected evidence (filled by the executor)
+- [ ] Change summary (what & why — if it can't explain what changed, don't trust the code)
+- [ ] Diff provided
+- [ ] Test results provided
+- [ ] Screenshots / demo provided
 
-## 验收结论（指挥会话回填）
-- [ ] 合入 / 打回 / 调整方向
-- 备注：
+## Acceptance decision (filled by the conductor)
+- [ ] merge / rework / redirect
+- Notes:
 ```

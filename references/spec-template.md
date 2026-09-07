@@ -1,30 +1,29 @@
-# SPEC 模板（大功能先写，一句话能说清就跳过）
+# SPEC Template (write one for big features; skip if it fits in one sentence)
 
 ```markdown
-# [功能名] 规格说明
+# [Feature name] — specification
 
-## 背景与问题
-（为什么要做：现状痛点 / 约束）
+## Background & problem
+(Why: current pain points / constraints)
 
-## 目标与非目标（Not Doing）
-- 目标：
-- 非目标（明确不做，Not Doing 清单最有价值）：
+## Goals & non-goals (Not Doing)
+- Goals:
+- Non-goals (explicitly not doing; the Not Doing list is the most valuable part):
 
-## 关键假设（你在赌什么为真，含验证方法）
-- （假设 1：验证法）
-- （假设 2：验证法）
+## Key assumptions (what you're betting on, with how to verify)
+- (Assumption 1: how to verify)
+- (Assumption 2: how to verify)
 
-## 方案
-（技术选型、关键设计决策、数据结构/接口要点）
+## Approach
+(Tech choices, key design decisions, data structures / interface points)
 
-## 验收标准
-- [ ] 可执行、可验证的标准（客观门禁，不是"觉得行"）
+## Acceptance criteria
+- [ ] Executable, verifiable criteria (objective gates, not "feels done")
 
-## 风险与未知
-- （不确定的地方、需要调研的点）
+## Risks & unknowns
+- (Uncertain areas, things to investigate)
 
-## 拆卡建议
-- 建议拆为任务卡：
-  - [ ] tasks/001-xxx
-  - [ ] tasks/002-xxx
+## Suggested task cards
+- [ ] tasks/001-xxx
+- [ ] tasks/002-xxx
 ```

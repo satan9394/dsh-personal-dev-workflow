@@ -3,71 +3,74 @@ slug: personal-dev-workflow
 name: personal-dev-workflow
 displayName: Personal Dev Workflow
 description: |
-  个人开发工作流：融合 OpenAI Codex（harness engineering/Symphony）、Anthropic（Claude Code 最佳实践）、
-  DeepSeek Harness 实测。当用户要做项目开发、编码任务、开工、拆任务卡、实现功能、修 bug、写代码、
-  推进开发进度、个人项目或长期生产项目开发时使用。
+  A lean personal development workflow distilled from OpenAI Codex (harness engineering / Symphony),
+  Anthropic (Claude Code best practices) and DeepSeek Harness field experience. Use it whenever the user
+  starts a project, says "let's build", breaks work into task cards, implements a feature, fixes a bug,
+  writes code, or drives a personal / long-running production project.
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh]
 version: "0.3.0"
 ---
 
-# Personal Dev Workflow v3（personal-dev-workflow）
+# Personal Dev Workflow v3 (personal-dev-workflow)
 
-> 一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环。人只做提需求与拍板，搬运与转述全部自动化。
-> 依据与出处：`references/framework.md`（可选阅读）。
+> One conductor + isolated Workers + file-based memory + a verification loop.
+> The human only raises requirements and signs off; all hauling and relaying is automated.
+> Rationale & sources: `references/framework.md` (optional reading).
 
-## 何时用
+## When to use
 
-- 开始开发项目 / 说"开工" / 拆任务 / 实现功能 / 修 bug
-- 大需求要分解成可执行任务并持续推进
-- 长期项目要稳定节奏与可追溯进度
+- Starting a dev project / saying "let's build" / breaking work down / implementing a feature / fixing a bug
+- Turning a large requirement into executable tasks that keep moving
+- Long-running projects that need a steady rhythm and traceable progress
 
-## 核心五原则（每条一句）
+## Core principles (one line each)
 
-1. 一个项目 = 一个工作区 + 一个指挥会话（主会话只留「目标 + 文件指针 + 摘要」）。
-2. 任务卡落盘 `tasks/`（一张卡一个文件；执行者只认卡，不靠聊天记录）。
-3. 每张卡一个隔离执行器，干完交工作证明（diff + 测试 + 截图）。
-4. 干活的不打分：验证/评审用全新上下文，只见 diff 与验收标准。
-5. 记忆全在文件里（AGENTS.md / docs/ / tasks/）；对话会忘，文件不会。
+1. One project = one workspace + one conductor session (the main session keeps only "goal + file pointers + summaries").
+2. Task cards live on disk in `tasks/` (one card per file; executors read the card, not the chat log).
+3. One isolated executor per card; it hands back proof of work (diff + tests + screenshots).
+4. The one who does the work doesn't grade it: review in a fresh context that sees only the diff and the acceptance criteria.
+5. All memory lives in files (AGENTS.md / docs/ / tasks/); conversations forget, files don't.
 
-## 六步循环
+## The six-step loop
 
-1. **拆卡**：模糊需求先收敛一页纸（Problem / 关键假设 / MVP / Not Doing）；大功能写 SPEC（一句话能说清就跳过）；陌生代码库先探索（聚焦检索 3-5 次收手，查影响面：调用者/测试/接口）。
-2. **派活**：一张卡 → 一个隔离执行器（子代理优先；想用 Codex 就 codex exec）。卡必含**限制条件（不能改什么）**与预期证据。派活三问：谁来协调？子任务独立吗？会改同一批文件吗？能单不多；外部副作用（发送/发布/删除）不默认授权。
-3. **交证**：改动摘要（说不清改了什么，代码不要直接信）+ diff + 测试 + 截图，并引用依据来源。
-4. **验证**：客观门禁（可执行标准，不是"觉得行"）；默认怀疑（假设代码是坏的，除非被证明能跑）；Review 五件事（超范围 / 改错文件 / 接口兼容 / 异常处理 / 可维护性）；大改动派评审子代理反向挑错；同一问题修复 3 次即熔断重来。
-5. **验收**：用户拍板三选一：合入 / 打回 / 调整方向。
-6. **复盘**：教训写进 AGENTS.md（对应真实犯过的错）；重复 3 遍的事停下来自动化；定期垃圾回收失效规则。
+1. **Break down**: converge a fuzzy requirement to one page (Problem / key assumptions / MVP / Not Doing); write a SPEC for big features (skip the plan if it fits in one sentence); explore unfamiliar codebases first (focused 3–5 searches, then stop; check the blast radius: callers / tests / interfaces).
+2. **Dispatch**: one card → one isolated executor (subagents by default; use `codex exec` if you prefer Codex). Every card MUST include constraints (what must NOT be changed) and expected evidence. Three dispatch questions: who coordinates? is the subtask truly independent? will it touch the same files? Prefer a single agent when possible; external side effects (send / publish / delete) are not authorized by default.
+3. **Proof of work**: a change summary (if it can't explain what changed, don't trust the code) + diff + tests + screenshots, citing its source (spec / card items).
+4. **Verify**: objective gates (executable criteria, not "feels done"); default suspicion (assume the code is broken until proven to run); Review five things (out-of-scope changes / wrong files / interface compatibility / error handling / maintainability); dispatch a reviewer subagent with a fresh context for large changes; hard stop after 3 failed fixes (circuit breaker) and start over.
+5. **Accept**: the user picks one of three — merge / rework / redirect.
+6. **Retro**: write lessons into AGENTS.md (mapped to real mistakes); automate anything repeated 3+ times; garbage-collect stale rules periodically.
 
-## 规则文件纪律（AGENTS.md / CLAUDE.md）
+## Rule-file discipline (AGENTS.md / CLAUDE.md)
 
-1. **100 行原则，地图不是手册**：只写 agent 猜不到的；每行问"删掉会导致犯错吗？不会就删"。
-2. **犯错驱动生长**：空文件开始，每次犯错加一条规则（复利）；护栏用排除式不变量（「本项目不用 X」）。
-3. **建议 vs 约束**：规则文件是建议；红线（删除/副作用/危险命令）用 DSH pre-execute 门禁硬拦并实测（黑/白名单各测一次）。
+1. The 100-line principle: a map, not a manual. Write only what the agent can't guess; for every line ask "would deleting it cause a mistake? If not, delete it."
+2. Grows from mistakes: start empty; add one rule per real mistake (compounding); use exclusion invariants ("this project does not use X") instead of enumerating options.
+3. Advice vs constraint: rule files are advice; red lines (deletion / side effects / dangerous commands) need machine-level enforcement (DSH pre-execute gates) plus testing (blacklist AND whitelist, each once).
 
-## 上下文与成本
+## Context & cost
 
-- 仓库是唯一真相来源；对话只留指针。
-- 污染三策略：compaction（连续性重要时）/ context reset（修正 2 次还错就清空重来）/ 开新会话（不相关任务）。
-- 长循环设预算上限；通过率 <50% 停下复盘流程本身；>2 轮循环必须有落盘记忆。
-- 每 2-3 周做一次全局对抗式审查（恶意用户视角）。
+- The repo is the single source of truth; conversations keep only pointers.
+- Three pollution strategies: compaction (when continuity matters) / context reset (after 2 failed fixes, clear and restart) / a new session (for unrelated work).
+- Cap budgets on long loops; if the acceptance rate < 50%, stop and rethink the process itself; loops > 2 rounds must have on-disk memory.
+- Run a global adversarial review (malicious-user view) every 2–3 weeks.
 
-## 规模适配
+## Scale
 
-- **小（几天）**：一个会话 + 子代理按需 + 5-10 张卡；验证靠测试与自测。
-- **大/长期（周-月）**：tasks/ 当看板 + goal 续跑 + 并行 3-5 Worker + 每周复盘进 AGENTS.md。
-- **生产级**：验证进 CI；worktree 隔离；评审 agent 把关；PR 走最后一公里。
+- Small (days): one session + subagents on demand + 5–10 cards; verify with tests and self-checks.
+- Large / long-running (weeks–months): tasks/ as the board + goal continuation + 3–5 parallel workers + weekly retro into AGENTS.md.
+- Production: verification in CI; worktree isolation; reviewer agents; escort the PR the last mile.
 
-## 模板与参考
+## Templates & references
 
-- 任务卡 `references/task-card-template.md` · SPEC `references/spec-template.md` · 验证清单 `references/verify-checklist.md`
-- 可选背景：`references/framework.md`（五组件/出处/成本数字/规模细节）
+- Task card `references/task-card-template.md` · SPEC `references/spec-template.md` · Verify checklist `references/verify-checklist.md`
+- Optional background: `references/framework.md`
+- 中文版见 `SKILL.zh-CN.md`（同名变体，正文中文，模板在 `references.zh-CN/`）。
 
-## 自查清单（每张卡收尾核对）
+## Checklist (before closing each card)
 
-- [ ] 卡含：目标 / 验收标准 / 涉及文件 / 限制条件 / 预期证据
-- [ ] 交证含改动摘要 + diff + 测试 + 截图
-- [ ] 客观门禁验证通过；大改动有评审（Review 五件事）
-- [ ] 用户已拍板（合入 / 打回 / 改向）
-- [ ] 教训已进 AGENTS.md；重复 3 遍的已自动化；长循环有预算上限
+- [ ] Card has: goal / acceptance criteria / files / constraints / expected evidence
+- [ ] Proof of work includes a change summary + diff + tests + screenshots
+- [ ] Objective gates pass; large changes got a review (Review five things)
+- [ ] User signed off (merge / rework / redirect)
+- [ ] Lessons are in AGENTS.md; anything repeated 3× is automated; long loops are budgeted
