@@ -2,10 +2,7 @@
 slug: personal-dev-workflow
 name: personal-dev-workflow
 displayName: 个人开发工作流（Personal Dev Workflow）
-description: |
-  个人开发工作流：融合 OpenAI Codex（harness engineering/Symphony）、Anthropic（Claude Code 最佳实践）、
-  DeepSeek Harness 实测。当用户要做项目开发、编码任务、开工、拆任务卡、实现功能、修 bug、写代码、
-  推进开发进度、个人项目或长期生产项目开发时使用。
+description: 个人开发工作流：一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环；任务卡六步循环，人只做提需求与拍板。用于项目开发、拆任务卡、实现功能、修 bug。
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh]

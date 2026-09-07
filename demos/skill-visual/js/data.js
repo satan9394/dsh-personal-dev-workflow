@@ -42,10 +42,10 @@ window.DATA = {
   ],
 
   templates: [
-    { icon: "🎫", title: "任务卡模板", desc: "目标/限制条件/客观门禁/涉及文件/预期证据", path: "../../references/task-card-template.md" },
-    { icon: "📐", title: "SPEC 模板", desc: "Not Doing + 关键假设（含验证法）+ 验收标准", path: "../../references/spec-template.md" },
-    { icon: "✅", title: "验证清单", desc: "Review 五件事 + 对抗性评审 + 熔断检查", path: "../../references/verify-checklist.md" },
-    { icon: "📖", title: "背景与出处（可选）", desc: "五组件/100 行原则/成本数字/公司做法对照", path: "../../references/framework.md" }
+    { icon: "🎫", title: "任务卡模板", desc: "目标/限制条件/客观门禁/涉及文件/预期证据", path: "../../skills/personal-dev-workflow/references/task-card-template.md" },
+    { icon: "📐", title: "SPEC 模板", desc: "Not Doing + 关键假设（含验证法）+ 验收标准", path: "../../skills/personal-dev-workflow/references/spec-template.md" },
+    { icon: "✅", title: "验证清单", desc: "Review 五件事 + 对抗性评审 + 熔断检查", path: "../../skills/personal-dev-workflow/references/verify-checklist.md" },
+    { icon: "📖", title: "背景与出处（可选）", desc: "五组件/100 行原则/成本数字/公司做法对照", path: "../../skills/personal-dev-workflow/references/framework.md" }
   ],
 
   checklist: [

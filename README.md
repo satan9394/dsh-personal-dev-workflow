@@ -8,7 +8,7 @@ v3 已去冗余：147 行 → **67 行**，每行规则都有出处。
 
 ## 特性
 
-- **Skill 形态**：`SKILL.md`（正文 67 行）+ 4 个可直接使用的模板（任务卡 / SPEC / 验证清单 / 背景出处），
+- **Skill 形态**：`skills/personal-dev-workflow/SKILL.md`（正文 67 行）+ 4 个可直接使用的模板（任务卡 / SPEC / 验证清单 / 背景出处），
   兼容 DSH（`.dsh/skills/` 或 `~/.dsh/skills/`）与 Claude Code（`~/.claude/skills/`）的 SKILL.md 约定。
 - **插件形态**：`plugin/dsh-personal-dev-workflow/` 为 DSH bundle 插件（与 dsh-ppt-creator 同构），
   可 `dsh plugin add link:` 安装。
@@ -16,26 +16,29 @@ v3 已去冗余：147 行 → **67 行**，每行规则都有出处。
 - **依据扎实**：融合 OpenAI Codex（harness engineering / Symphony）、Anthropic（Claude Code 最佳实践）
   与 DeepSeek Harness 实测；对照表见 `references/framework.md`。
 
-## 中英文双版本
+## 中英文双版本（标准 skills/ 布局）
 
-- **English（默认）**：`SKILL.md` + `references/` —— 市面默认语言。
-- **中文版**：`SKILL.zh-CN.md` + `references.zh-CN/` —— 同名变体，正文与模板均为中文。
-- 任选一版使用：把 `SKILL.md`（或 `SKILL.zh-CN.md` 改名为 `SKILL.md`）连同对应 `references/` 复制到
-  目标工作区的 `.dsh/skills/personal-dev-workflow/`（DSH）或 `~/.claude/skills/personal-dev-workflow/`（Claude Code）。
-- 插件形态内置两个 skill：`personal-dev-workflow`（英文）与 `personal-dev-workflow-zh`（中文），安装后自选。
+- **English（默认）**：`skills/personal-dev-workflow/`（SKILL.md + references/）——市面默认语言。
+- **中文版**：`skills/personal-dev-workflow-zh/`（同名变体，正文与模板均为中文）。
+- 兼容 Vercel 开放生态：`npx skills add satan9394/dsh-personal-dev-workflow` 自动发现两个 skill。
+- 或手动复制：把 `skills/personal-dev-workflow/`（或 `-zh`）复制到目标工作区 `.dsh/skills/`（DSH）或 `~/.claude/skills/`（Claude Code）。
+- 插件形态内置两个 skill：`personal-dev-workflow`（英文）与 `personal-dev-workflow-zh`（中文）。
 
 ## 结构
 
 ```
 dsh-personal-dev-workflow/
-├── SKILL.md                       # v3 英文主版（正文 67 行）
-├── SKILL.zh-CN.md                 # 中文变体
-├── references/                    # 英文模板（framework / task-card / spec / verify-checklist）
-├── references.zh-CN/              # 中文模板
-├── taskcard-cli.js                # 配套零依赖 CLI：管理 tasks/ 任务卡（复制到项目根目录使用）
-├── plugin/dsh-personal-dev-workflow/   # DSH bundle 插件（含 en + zh 两个 skill）
-├── dist/                          # skillhub 发布包（skillhub-pkg-en / skillhub-pkg-zh）
-└── demos/                         # 可视化演示（行业调研 / 流程打法 / skill 本体）
+├── skills/
+│   ├── personal-dev-workflow/         # v3 英文主版（正文 67 行）
+│   │   ├── SKILL.md
+│   │   └── references/                # 模板（framework / task-card / spec / verify-checklist）
+│   └── personal-dev-workflow-zh/      # 中文版（同名变体）
+│       ├── SKILL.md
+│       └── references/
+├── taskcard-cli.js                    # 配套零依赖 CLI：管理 tasks/ 任务卡（复制到项目根目录使用）
+├── plugin/dsh-personal-dev-workflow/  # DSH bundle 插件（含 en + zh 两个 skill）
+├── dist/                              # skillhub 发布包（skillhub-pkg-en / skillhub-pkg-zh）
+└── demos/                             # 可视化演示（行业调研 / 流程打法 / skill 本体）
 ```
 
 ## 配套工具与演示
@@ -51,8 +54,10 @@ dsh-personal-dev-workflow/
 
 ## 安装与使用
 
-**Skill 形态（推荐，无需安装）**：把 `SKILL.md` 与 `references/` 复制到目标工作区的
-`.dsh/skills/personal-dev-workflow/`（DSH）或 `~/.claude/skills/personal-dev-workflow/`（Claude Code）。
+**Skill 形态（推荐，无需安装）**：
+- `npx skills add satan9394/dsh-personal-dev-workflow`（自动发现 `skills/` 下两个版本，可 `--skill` 指定）
+- 或把 `skills/personal-dev-workflow/`（英文）或 `skills/personal-dev-workflow-zh/`（中文）复制到
+  目标工作区的 `.dsh/skills/`（DSH）或 `~/.claude/skills/`（Claude Code）。
 
 **插件形态（DSH）**：
 
