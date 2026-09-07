@@ -8,7 +8,7 @@ v3 已去冗余：147 行 → **67 行**，每行规则都有出处。
 
 ## 特性
 
-- **Skill 形态**：`SKILL.md`（67 行）+ 4 个可直接使用的模板（任务卡 / SPEC / 验证清单 / 背景出处），
+- **Skill 形态**：`SKILL.md`（正文 67 行）+ 4 个可直接使用的模板（任务卡 / SPEC / 验证清单 / 背景出处），
   兼容 DSH（`.dsh/skills/` 或 `~/.dsh/skills/`）与 Claude Code（`~/.claude/skills/`）的 SKILL.md 约定。
 - **插件形态**：`plugin/dsh-personal-dev-workflow/` 为 DSH bundle 插件（与 dsh-ppt-creator 同构），
   可 `dsh plugin add link:` 安装。
@@ -20,7 +20,7 @@ v3 已去冗余：147 行 → **67 行**，每行规则都有出处。
 
 ```
 dsh-personal-dev-workflow/
-├── SKILL.md                       # v3 主文件（67 行）
+├── SKILL.md                       # v3 主文件（正文 67 行）
 ├── references/
 │   ├── framework.md               # 可选背景：五组件/出处/成本数字/公司做法对照
 │   ├── task-card-template.md      # 任务卡模板

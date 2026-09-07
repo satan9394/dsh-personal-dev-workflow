@@ -29,7 +29,7 @@ dsh-personal-dev-workflow/
 ├── cordis.patch.yml   # bundle patch 层
 ├── package.json       # dsh.bundle manifest
 └── skills/personal-dev-workflow/
-    ├── SKILL.md                       # v3 主文件（67 行，去冗余）
+    ├── SKILL.md                       # v3 主文件（正文 67 行，去冗余）
     └── references/
         ├── framework.md               # 可选背景：五组件/出处/成本数字/与顶级公司对照
         ├── task-card-template.md      # 任务卡模板
