@@ -2,7 +2,7 @@
 slug: personal-dev-workflow
 name: personal-dev-workflow
 displayName: Personal Dev Workflow
-description: A lean personal development workflow distilled from OpenAI Codex (harness engineering / Symphony) and Anthropic (Claude Code best practices) plus DeepSeek Harness field experience: one conductor + isolated workers + file-based memory + a verification loop; a six-step task-card cycle (break down → dispatch → proof of work → verify → accept → retro); the human only raises requirements and signs off. Use it whenever the user starts a project, says "let's build", breaks work into task cards, implements a feature, fixes a bug, writes code, or drives a personal / long-running production project.
+description: "A lean personal development workflow distilled from OpenAI Codex (harness engineering / Symphony) and Anthropic (Claude Code best practices) plus DeepSeek Harness field experience: one conductor + isolated workers + file-based memory + a verification loop; a six-step task-card cycle (break down → dispatch → proof of work → verify → accept → retro); the human only raises requirements and signs off. Use it whenever the user starts a project, says \"let's build\", breaks work into task cards, implements a feature, fixes a bug, writes code, or drives a personal / long-running production project."
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh]

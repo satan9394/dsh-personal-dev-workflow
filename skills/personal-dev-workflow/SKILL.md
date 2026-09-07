@@ -2,7 +2,7 @@
 slug: personal-dev-workflow
 name: personal-dev-workflow
 displayName: Personal Dev Workflow
-description: A lean personal development workflow: one conductor + isolated workers + file-based memory + a verification loop; a six-step task-card cycle; the human only raises requirements and signs off. Use it for project development, task breakdown, feature work, and bug fixes.
+description: "A lean personal development workflow: one conductor + isolated workers + file-based memory + a verification loop; a six-step task-card cycle; the human only raises requirements and signs off. Use it for project development, task breakdown, feature work, and bug fixes."
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh]

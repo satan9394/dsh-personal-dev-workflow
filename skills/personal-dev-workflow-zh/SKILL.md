@@ -1,6 +1,6 @@
 ---
-slug: personal-dev-workflow
-name: personal-dev-workflow
+slug: personal-dev-workflow-zh
+name: personal-dev-workflow-zh
 displayName: 个人开发工作流（Personal Dev Workflow）
 description: 个人开发工作流：一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环；任务卡六步循环，人只做提需求与拍板。用于项目开发、拆任务卡、实现功能、修 bug。
 metadata:
