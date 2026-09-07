@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人开发工作流：Codex + Anthropic + DeepSeek Harness 经验合流</title>
+<meta name="description" content="一套适用于个人开发与长期生产项目的 Agent 开发流程可视化">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="topnav">
+  <div class="topnav-inner">
+    <span class="brand">🧭 个人开发工作流</span>
+    <nav class="nav-links">
+      <a href="#principles">原则</a>
+      <a href="#lifecycle">生命周期</a>
+      <a href="#tools">工具分工</a>
+      <a href="#scales">规模适配</a>
+      <a href="#pitfalls">避坑</a>
+      <a href="#kickoff">开场动作</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ HERO：任务卡生命周期循环动画 ============ -->
+<section class="hero" id="hero">
+  <canvas id="heroCanvas"></canvas>
+  <div class="hero-content">
+    <p class="hero-kicker">三厂经验合流 · 个人开发专用</p>
+    <h1 class="hero-title">个人开发工作流</h1>
+    <p class="hero-sub">
+      <strong>一个指挥 + 一堆隔离的 Worker + 文件记忆 + 验证闭环。</strong>
+      融合 Anthropic 的验证哲学、OpenAI Codex 的编排与记忆经验、DeepSeek Harness 的原生机制，
+      人只做两件事：提需求、拍板验收。
+    </p>
+    <div class="hero-cta">
+      <a class="btn primary" href="#lifecycle">看任务卡生命周期</a>
+      <a class="btn ghost" href="#principles">先看五原则</a>
+    </div>
+    <p class="hero-hint">↓ 滚动探索 · 中间的循环就是你的日常</p>
+  </div>
+</section>
+
+<!-- ============ 核心五原则 ============ -->
+<section class="section" id="principles">
+  <div class="section-head">
+    <p class="kicker">先立规矩</p>
+    <h2>核心五原则</h2>
+    <p class="section-desc">五条原则来自三家经验的交集，缺一条，流程就会退化回"凭感觉开发"。</p>
+  </div>
+  <div class="principles" id="principlesGrid"></div>
+</section>
+
+<!-- ============ 任务卡生命周期 ============ -->
+<section class="section" id="lifecycle">
+  <div class="section-head">
+    <p class="kicker">一张卡的一生</p>
+    <h2>任务卡生命周期：六步循环</h2>
+    <p class="section-desc">点每一步看细节。跑顺这个循环，"开发时懵逼"的问题自然消失——每一步都有明确产出与验收。</p>
+  </div>
+  <div class="stepper" id="stepper"></div>
+  <div class="step-detail" id="stepDetail"></div>
+  <p class="note">循环回到第 1 步：复盘产出的教训会进入下一张卡的拆卡依据（AGENTS.md / docs/）。</p>
+</section>
+
+<!-- ============ 工具分工 ============ -->
+<section class="section" id="tools">
+  <div class="section-head">
+    <p class="kicker">谁干什么</p>
+    <h2>工具分工（以 DSH 为主）</h2>
+    <p class="section-desc">每个角色只干一件事，各自独立、按需插拔——这正是"别融合，组合"的落地形态。</p>
+  </div>
+  <div class="tools" id="toolsGrid"></div>
+</section>
+
+<!-- ============ 规模适配 ============ -->
+<section class="section" id="scales">
+  <div class="section-head">
+    <p class="kicker">量体裁衣</p>
+    <h2>规模适配</h2>
+    <p class="section-desc">同一套循环，三档复杂度。小项目别搞仪式，大项目别省结构。</p>
+  </div>
+  <div class="scales" id="scalesGrid"></div>
+</section>
+
+<!-- ============ 避坑 ============ -->
+<section class="section" id="pitfalls">
+  <div class="section-head">
+    <p class="kicker">你踩过的坑</p>
+    <h2>三个坑 → 三条对策</h2>
+    <p class="section-desc">装备囤积、融合翻车、开发懵逼——每个坑都有明确的解法。</p>
+  </div>
+  <div class="pitfalls" id="pitfallsGrid"></div>
+</section>
+
+<!-- ============ 开场动作 ============ -->
+<section class="section" id="kickoff">
+  <div class="section-head">
+    <p class="kicker">第一天</p>
+    <h2>新项目开场动作</h2>
+    <p class="section-desc">五个动作，半小时内完成，之后就是循环往复。</p>
+  </div>
+  <div class="kickoff" id="kickoffList"></div>
+  <div class="memory-note" id="memoryNote"></div>
+</section>
+
+<footer class="footer">
+  <p>个人开发工作流 · 融合 Codex + Anthropic + DeepSeek Harness 经验 · 生成于 2026-09</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

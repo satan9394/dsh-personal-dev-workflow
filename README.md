@@ -32,8 +32,22 @@ dsh-personal-dev-workflow/
 ├── SKILL.zh-CN.md                 # 中文变体
 ├── references/                    # 英文模板（framework / task-card / spec / verify-checklist）
 ├── references.zh-CN/              # 中文模板
-└── plugin/dsh-personal-dev-workflow/   # DSH bundle 插件（含 en + zh 两个 skill）
+├── taskcard-cli.js                # 配套零依赖 CLI：管理 tasks/ 任务卡（复制到项目根目录使用）
+├── plugin/dsh-personal-dev-workflow/   # DSH bundle 插件（含 en + zh 两个 skill）
+├── dist/                          # skillhub 发布包（skillhub-pkg-en / skillhub-pkg-zh）
+└── demos/                         # 可视化演示（行业调研 / 流程打法 / skill 本体）
 ```
+
+## 配套工具与演示
+
+- **taskcard-cli**：`node taskcard-cli.js init|new|list|done`，零依赖管理 `tasks/` 任务卡。
+  注意：CLI 锚定自身所在目录，请把文件复制到项目根目录使用。
+- **dist/**：`skillhub-pkg-en`（英文发布包）与 `skillhub-pkg-zh`（中文发布包），可直接用于
+  `skillhub publish <目录>` 或对应平台上传。
+- **demos/**：三个纯静态可视化页面，浏览器直接打开 `demos/*/index.html`：
+  - `agent-workflow-visual` — 顶级 AI 公司内部 Agent 开发流程调研
+  - `personal-workflow-visual` — 本工作流打法图解
+  - `skill-visual` — skill 本体可视化（Three.js 3D + SVG 动画，离线回退 2D）
 
 ## 安装与使用
 

@@ -1,0 +1,328 @@
+/* ============================================================
+ * data.js — 全部内容数据（与渲染逻辑分离）
+ * 事实来源：公开资料 + DeepSeek Harness 源码核实
+ * 标注 [调研中] 的字段等待后台调研子代理返回后填充
+ * ============================================================ */
+
+window.DATA = {
+
+  /* ---------------- 速览数字 ---------------- */
+  kpis: [
+    {
+      num: "≈100%",
+      label: "OpenAI 几乎所有新代码由 Codex 编写（CEO Sam Altman 公开表态）",
+      src: "aidatainsider.com 报道"
+    },
+    {
+      num: "25%→75%",
+      label: "Google 新代码中 AI 生成的比例三级跳：Pichai 2024-10 超 1/4 → 2025-10 近一半 → 2026-04 达 75%（均经工程师评审验收）",
+      src: "The Verge / Chrome Unboxed / TOI"
+    },
+    {
+      num: "55% / 80%",
+      label: "Meta 内部目标（泄露文件）：软件工程师 55% 代码变更需智能体辅助、80% 中高级工程师采用 AI 工具",
+      src: "Business Insider 独家，未经官方证实"
+    },
+    {
+      num: "10–15",
+      label: "Anthropic 的 Claude Code 之父 Boris Cherny 同时并行运行的 Agent 实例数",
+      src: "Boris Cherny 分享/第三方转述"
+    },
+    {
+      num: "2–3×",
+      label: "给 Agent 验证自己工作的能力后，产出质量提升倍数（Boris 原话 + 官方最佳实践佐证）",
+      src: "Boris Cherny 分享/第三方转述"
+    },
+    {
+      num: "+500%",
+      label: "部分团队落地 Symphony 后前三周合并 PR 增速",
+      src: "openai/symphony SPEC + 官方发布"
+    }
+  ],
+
+  /* ---------------- 公司章节 ---------------- */
+  companies: {
+    anthropic: {
+      name: "Anthropic",
+      tagline: "Claude Code 之父的工作流",
+      verdict: "内部打法公开度最高：不是「一个对话」，而是「一个你 + 十几到几十个并行 Agent」。核心资产是团队共享的 CLAUDE.md 与验证闭环。",
+      points: [
+        {
+          title: "并行多开，人是项目经理",
+          desc: "终端开 5 个 Claude Code 实例 + 网页端 5–10 个任务 + 手机启动任务晚上回来看结果。核心心态：让 AI 自己跑，人只在需要确认时介入。"
+        },
+        {
+          title: "CLAUDE.md：团队共享的「项目记忆」",
+          desc: "整个团队共用一个提交进 Git 的 CLAUDE.md，规则极简——每次看到 Claude 做错了，就把「别这样做」写进去；代码评审时 @.claude 自动把新规则加进文件。Boris 称之为「复利工程」：每次纠错都变成团队资产。"
+        },
+        {
+          title: "Plan 模式先行",
+          desc: "大多数会话从计划模式开始：先给执行计划，人来回讨论修改，满意后再切自动执行。先设计再编码，避免方向错了返工。"
+        },
+        {
+          title: "斜杠命令 + 子 Agent 固化重复劳动",
+          desc: "把每天用几十次的操作做成命令（如 /commit-push-pr）；用子 Agent 专门干一类活（code-simplifier 简化代码、verify-app 跑端到端测试）。"
+        },
+        {
+          title: "长任务不等人",
+          desc: "完成后自动用后台 Agent 验证；用 ralph-wiggum 插件（把同一任务说明书反复喂给 AI 直到完成，DSH 的 ralph 即同源概念）；沙箱里用 dontAsk 权限不被确认打断。"
+        },
+        {
+          title: "最重要：给 AI 验证能力",
+          desc: "Boris 说这是提升产出质量最重要的因素：写代码后自己跑测试、在浏览器里自测 UI、发现问题迭代直到通过。验证闭环让质量提升 2–3 倍。"
+        }
+      ],
+      flow: {
+        title: "ANTHROPIC 内部流程",
+        nodes: ["你 · 项目经理", "Claude Code ×5", "网页任务 ×5–10", "手机任务", "CLAUDE.md 团队记忆", "验证闭环 测试/自测"],
+        edges: [[0, 1], [0, 2], [0, 3], [1, 4], [2, 4], [3, 4], [1, 5], [2, 5]],
+        active: [5]
+      }
+    },
+
+    openai: {
+      name: "OpenAI",
+      tagline: "Codex 自举 + Symphony 编排",
+      verdict: "OpenAI 是 Codex 的最大用户：几乎所有新代码由 Codex 编写；同时开源了 Symphony 编排规范（把项目工作变成隔离的自主执行 run），并正在把 Codex 记忆系统从「有损压缩」重构为「硬切窗口 + 外部记忆」。",
+      points: [
+        {
+          title: "Codex 自举",
+          desc: "CEO Sam Altman 公开表示 Codex 用于 OpenAI 几乎所有新代码；媒体称 Codex 在开发者监督下编写了自身代码的大部分。OpenAI 用自己产品开发自己产品，形成 dogfooding 闭环。"
+        },
+        {
+          title: "Symphony：开源的编排规范",
+          desc: "把项目工作变成「隔离的、自主的执行 run」，让团队管理「工作」而不是监督「Agent」。官方演示：监听 Linear 看板 → 自动派 Agent → Agent 提交工作证明（CI 状态、PR review 反馈、复杂度分析、演示视频）→ 验收通过 → 自动落地 PR。它是 SPEC，任何 coding agent 都能按它实现。"
+        },
+        {
+          title: "记忆系统重构：告别有损压缩",
+          desc: "开发者 Nico Ritschel 披露 + 已合并 PR：token_budget 实时告知模型当前窗口和剩余 token（油表）；get_context_remaining 让模型主动查余量；new_context 主动申请全新干净窗口（不携带旧对话、不自动生成压缩摘要）；notes 保存跨窗口进度/已排除路径/下一步计划；history 保存原始记录可搜索追溯。动机：压缩会丢「失败尝试的根本原因」，导致重蹈覆辙。"
+        },
+        {
+          title: "harness engineering：是方法论，不是产品",
+          desc: "OpenAI 官方文章（2026-02）提出 harness engineering = 为编码 agent 造「挽具」：系统化上下文、护栏、反馈环、可验证性。⚠️ 它与 DeepSeek Harness 纯属同名撞车、语义不同——DSH 是软件产品，harness engineering 是方法论。实验数据：3 名工程师驱动 Codex，5 个月 0 行手写代码、约 100 万行、约 1,500 个 PR，人均 3.5 PR/天，耗时约为手写 1/10。「Humans steer. Agents execute.」（人掌舵，agent 执行）。AGENTS.md 是地图不是百科全书（约 100 行做索引，docs/ 是事实源，linter+CI 机械校验）。"
+        },
+        {
+          title: "Symphony SPEC 细节：看板即控制面",
+          desc: "每张 issue 一个隔离工作区 + 独立 agent 会话；Conductor 是唯一权威状态（轮询、派发、重试、对账）；任务卡含 id/票号/优先级/状态/分支名/标签/阻塞关系；工作证明是 review packet（含功能演示视频），再由 Symphony 护送 PR 走最后一公里（盯 CI、rebase、解冲突）。官方经验：「大多数人可同时舒服地管理 3–5 个会话」——与 Anthropic 的并行实例数互相印证。"
+        }
+      ],
+      flow: {
+        title: "OPENAI · SYMPHONY 编排流程",
+        nodes: ["Linear 看板", "Conductor 调度", "隔离 Worker ×N", "工作证明 CI/PR/视频", "人工验收", "落地 PR"],
+        edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]],
+        active: [4]
+      }
+    },
+
+    google: {
+      name: "Google",
+      tagline: "AI 写码占比三级跳：25% → 50% → 75%",
+      verdict: "Pichai 财报电话会时间线（均经工程师评审验收）：2024-10 超 1/4 新代码由 AI 生成 → 2025-10 近一半 → 2026-04 Cloud Next 更新为 75%。内部主流只用自家 Gemini 系工具，多数员工被禁外部 AI 工具（部分 DeepMind 团队例外获准用 Claude）。",
+      points: [
+        {
+          title: "占比三级跳，人始终是验收者",
+          desc: "2024-10-29 原话：「More than a quarter of all new code at Google is generated by AI, then reviewed and accepted by engineers.」→ 2025-10 财报会「近一半」→ 2026-04 达 75%。注意：AI 生成 ≠ 直接合入，每一行都过工程师评审验收——「生成 + 评审」是 Google 的标准姿势。"
+        },
+        {
+          title: "Jules：每任务一个隔离云 VM",
+          desc: "2025-05 发布的异步编码 agent（Gemini 2.5 Pro），每任务独立云端 VM、GitHub 开分支建 PR、集成 Linear。据 Labs PM 在 I/O 演讲，发布两周即产生约 4 万公开 commit；演示「变体并行」（多 agent 并行试不同方案）与「成功标准」提示模板（don't stop until you see this）。"
+        },
+        {
+          title: "内部工具政策：只有 Gemini 系",
+          desc: "Business Insider 独家：多数 Googler 被禁外部 AI 工具、只用自家 Gemini 系；部分 DeepMind 团队获准用 Claude，形成「Claude 有/无阶层」的内部裂痕；有工程师称内部模型编码不如 Claude；AI 使用目标已计入部分人绩效。"
+        },
+        {
+          title: "碎片整合进 Antigravity",
+          desc: "据 Bloomberg 转述：Google 正把 Gemini Code Assist / Gemini CLI / AI Studio / Firebase Studio / Jules 等碎片产品整合进 Antigravity；Jules 前负责人离职去 OpenAI，称问题是「并行工具、重叠界面」的「系统问题，不是人才问题」。"
+        }
+      ],
+      flow: {
+        title: "GOOGLE 内部流程",
+        nodes: ["需求", "Jules / Gemini CLI", "隔离 VM ×N 变体并行", "工程师评审验收", "合入"],
+        edges: [[0, 1], [1, 2], [2, 3], [3, 4]],
+        active: [3]
+      }
+    },
+
+    meta: {
+      name: "Meta",
+      tagline: "Zuckerberg：AI 将是「中级工程师」",
+      verdict: "Zuckerberg 多次公开表态：12–18 个月内大部分代码由 AI 编写、且质量超过团队普通优秀的人。据泄露内部文件（未经官方证实）：2025 Q4 目标——软件工程师 55% 代码变更需智能体辅助、80% 中高级工程师采用 AI 工具。与 Google 相反，Meta 允许员工使用 Claude 等外部工具。",
+      points: [
+        {
+          title: "「中级工程师」预言",
+          desc: "2025-01 Joe Rogan 播客：「2025 年，我们 Meta 将拥有一个能当『中级工程师』、会写代码的 AI。」"
+        },
+        {
+          title: "质量论断",
+          desc: "2025-04 Dwarkesh Patel 访谈：「未来 12–18 个月内，大部分代码将由 AI 编写……它写出的代码质量已经超过团队里普通优秀的人。」"
+        },
+        {
+          title: "内部硬指标（泄露文件，未经官方证实）",
+          desc: "2025 Q4 公司层目标：软件工程师代码变更 55% 需智能体辅助、80% 中高级工程师采用通用 AI 工具（DevMate / Metamate / Gemini）；Creation 组织 2026 上半年目标：65% 工程师的承诺代码中 >75% 由 AI 完成。是否计入绩效不明确。"
+        },
+        {
+          title: "与 Google 相反：允许外部工具",
+          desc: "Meta 允许员工内部使用 Claude 等外部工具（与 Google 的政策形成对照）；CTO Bosworth 负责「AI for Work」；Reality Labs 已出现「AI Builder / AI Pod Lead」等新头衔。"
+        }
+      ],
+      flow: {
+        title: "META 内部流程",
+        nodes: ["需求", "AI 编码助手 DevMate/Claude", "代码变更 55% 智能体辅助", "工程师 Review", "合入"],
+        edges: [[0, 1], [1, 2], [2, 3], [3, 4]],
+        active: [3]
+      }
+    },
+
+    github: {
+      name: "GitHub / 微软",
+      tagline: "@Copilot 是核心仓库的「活跃贡献者」",
+      verdict: "GitHub 官方博客：在 github.com 核心仓库里 @Copilot 是被指派的 issue 的 active contributor——自己开 PR、修 100 个文件、清理 feature flag。微软内部：2026-05 吊销 Windows/M365 等部门多数 Claude Code 许可、强制转 Copilot CLI——原因是 Claude Code「perhaps a little too popular」+ 成本 + 工具链统一。",
+      points: [
+        {
+          title: "@Copilot 是「活跃贡献者」",
+          desc: "GitHub 官方博客（2025-11）：@Copilot 在 github.com 核心仓库被人类指派 issue、自己开 PR。抽样战绩：一个 PR 修 100 个文件 161 处拼写、清理 feature flag、全仓库类重命名、修复 Codespaces git push 15 分钟瓶颈。「让 Copilot 处理乏味的 80%，人专注关键的 20%」。"
+        },
+        {
+          title: "微软「太受欢迎」的 Claude Code",
+          desc: "2026-05 微软吊销 Experiences and Devices 部门（Windows/M365/Outlook/Teams/Surface）多数 Claude Code 内部许可，2026-06-30 强制转 GitHub Copilot CLI；EVP Rajesh Jha 备忘录，理由「toolchain unification」+ 成本。The Verge 记者 Tom Warren 首报。"
+        },
+        {
+          title: "数字与计费",
+          desc: "Nadella 称微软约 30% 代码由生成式 AI 产出（转述）；GitHub 2026-06-01 起 Copilot 全部转按量计费（GitHub AI Credits）——成本正成为新的组织级约束。"
+        }
+      ],
+      flow: {
+        title: "GITHUB 内部流程",
+        nodes: ["Issue 指派", "@Copilot 开 PR", "自动修复/清理/重命名", "人类评审", "合入"],
+        edges: [[0, 1], [1, 2], [2, 3], [3, 4]],
+        active: [3]
+      }
+    }
+  },
+  companyOrder: ["anthropic", "openai", "google", "meta", "github"],
+
+  /* ---------------- 记忆策略三代演进 ---------------- */
+  memoryStages: [
+    {
+      cls: "ms-1",
+      num: "①",
+      title: "有损压缩时代",
+      body: "上下文快满时，系统自动把旧对话「压成摘要」腾地方。缺点：摘要会丢掉失败根因、约束背景等关键细节，AI 可能重复执行已被验证无效的方案。DSH 默认也是这个思路（80% 触发压缩，保留 16% 逐字尾部），但只把它当兜底。",
+      verdict: ["bad", "细节丢失 · 重蹈覆辙"]
+    },
+    {
+      cls: "ms-2",
+      num: "②",
+      title: "硬切窗口 + 外部记忆",
+      body: "OpenAI 正在把 Codex 改为：油表感知余量（token_budget / get_context_remaining），主动申请全新干净窗口（new_context），用 notes 记进度与排除路径、用 history 保留原始记录供检索。干净的窗口 + 可检索的记录，代替「把一切塞在一个上下文里」。",
+      verdict: ["good", "干净窗口 + 笔记/历史可检索"]
+    },
+    {
+      cls: "ms-3",
+      num: "③",
+      title: "文件即记忆（业界共识）",
+      body: "Anthropic 的 CLAUDE.md、OpenAI 的 notes/history、DeepSeek Harness 的工作区文件（AGENTS.md、任务卡、进度笔记）——殊途同归：长期记忆放在文件里，对话只是工作内存，压缩只是安全网。你观察到的「DSH 把变动记进 MD 文件」正是这个共识。",
+      verdict: ["good", "文件是长期记忆 · 对话是工作内存"]
+    }
+  ],
+
+  /* ---------------- 共同模式 ---------------- */
+  pattern: {
+    title: "所有公司的共同拓扑",
+    nodes: ["人 · 决策与验收", "总指挥 Conductor", "Worker ×N 隔离上下文", "文件记忆 任务卡/规则/笔记", "验证闭环 测试/CI/工作证明"],
+    edges: [[0, 1], [1, 2], [2, 3], [2, 4], [4, 0]],
+    active: [1],
+    cards: [
+      { icon: "🎯", title: "一个指挥", desc: "人（或主会话）只负责拆解目标、分配任务、验收结果——不亲自下场干活。" },
+      { icon: "🧩", title: "一堆隔离的 Worker", desc: "每个任务一个独立上下文，互不污染；干完只回传结果摘要（Anthropic 并行实例 / Symphony 隔离 run / DSH 子代理同构）。" },
+      { icon: "📁", title: "文件记忆", desc: "任务卡、规则、进度全部落盘：CLAUDE.md / AGENTS.md / notes / tasks/ 目录。对话会忘，文件不会。" },
+      { icon: "✅", title: "验证闭环", desc: "每个 Worker 交「工作证明」：测试、CI、截图、演示。验证能力是质量提升 2–3 倍的头号因素。" }
+    ]
+  },
+
+  /* ---------------- 行业趋势信号 ---------------- */
+  trends: [
+    { tag: "UBER", title: "软件工厂", desc: "70%+ PR 由 AI agent 生成；自动化 250 项迁移共 900 万行；人均代码产出翻倍。" },
+    { tag: "UBER", title: "成本警示", desc: "5,000 名工程师用 Claude Code，月活 84–95%，人均 $500–2,000/月，34 亿美元 AI 预算 4 个月耗尽。" },
+    { tag: "DATADOG", title: "数百个 agent 产跑", desc: "生产环境跑 100+ agent，准备扩到数千：「智能不再是瓶颈，运维与 LLMOps 才是」。" },
+    { tag: "CURSOR", title: "agent 舰队", desc: "「工程师在管理 agent 舰队，而不是直接写代码」。" }
+  ],
+
+  /* ---------------- 三种落地方式对比 ---------------- */
+  compare: {
+    title: "你的旧流程 vs 行业模式：只差自动化",
+    rows: [
+      { dim: "任务定义", old: "DSH 规划任务卡（文件/对话）", sym: "Linear 看板 + 任务卡（SPEC）", dsh: "任务卡落盘 tasks/ 目录" },
+      { dim: "执行上下文", old: "每任务新开 Codex 对话（隔离 ✓）", sym: "隔离的自主执行 run（隔离 ✓）", dsh: "后台子代理独立会话（隔离 ✓）" },
+      { dim: "反馈通道", old: "你手动转述执行反馈（有损耗）", sym: "Agent 自动提交工作证明", dsh: "子代理直接回传 diff/测试结果" },
+      { dim: "验证方式", old: "基本靠人看", sym: "CI / PR review / 演示视频", dsh: "我读结果后自动跑验证命令" },
+      { dim: "人的角色", old: "搬运工 + 翻译官 + 决策者", sym: "管理工作而非监督 Agent", dsh: "只做决策与验收" },
+      { dim: "自动化程度", old: "低（手动中转）", sym: "高（Conductor 自动派发）", dsh: "高（我派发 + 回收 + 续跑）" }
+    ]
+  },
+
+  /* ---------------- 诊断 + Playbook ---------------- */
+  diagnosis: [
+    { title: "装备过剩，方法论不足", desc: "Skill、插件、Star 项目囤了一堆，SuperPower 这类重插件用不起来——问题不在装备不够，而在没有把「指挥 + Worker + 文件 + 验证」这套流程跑顺。" },
+    { title: "融合项目翻车的教训", desc: "把热门插件硬融成一个 Harness，运行出一堆问题——插件之间耦合、上下文互相污染、没有清晰的职责边界。行业共识恰恰相反：内核极简，能力按需插拔。" },
+    { title: "复制粘贴式协作费神", desc: "手动搬运任务卡、转述执行反馈，本质是让人当「翻译官」。信息在转述中失真，还消耗你的精力。这层管道应该自动化。" }
+  ],
+  playbook: [
+    {
+      title: "一个项目 = 一个工作区 + 一个指挥会话",
+      desc: "不要为每个任务开新对话。主会话是总指挥，只保留「目标 + 文件指针 + 结果摘要」。",
+      how: "DSH 实操：在该项目的文件夹下开一个对话即可，AGENTS.md 写好项目约定。"
+    },
+    {
+      title: "任务卡落盘成 tasks/ 目录（对标 Symphony）",
+      desc: "每张任务卡是一个文件：目标、验收标准、涉及文件、依赖。Worker 只认任务卡干活，不靠聊天记录。",
+      how: "对标 OpenAI Symphony 的「管理工作而非监督 Agent」：你看板（tasks/ 目录）即全局。"
+    },
+    {
+      title: "每张卡派一个隔离的 Worker",
+      desc: "子代理（或你偏好的 Codex 新会话）执行，上下文独立，干完只回传 diff/测试结果。",
+      how: "DSH 实操：我派后台子代理执行；想保留 Codex 就由脚本调 codex exec 按卡执行，结果落盘。"
+    },
+    {
+      title: "自动验证 + 工作证明",
+      desc: "每个 Worker 交「工作证明」：跑测试、构建、截图。不过关打回重做，过了才派下一张卡。",
+      how: "DSH 实操：我读结果后自动跑验证命令，把验证情况连同下一步建议摆给你。"
+    },
+    {
+      title: "你只做决策与验收",
+      desc: "把「搬运、转述、总结反馈」全部交给自动化；把「方向、取舍、验收」留给自己。",
+      how: "对标 Boris 的验证哲学与 Symphony 的「人工验收后落地 PR」。"
+    }
+  ],
+  closeText: "顶级 AI 公司内部没有秘密流程：一个总指挥 + 一堆隔离的 Worker + 文件记忆 + 验证闭环。你之前的「任务卡 + 每卡新对话 + 反馈后下一卡」方向完全正确，只是把该自动化的一环留给了手。装备（Skill/插件）是弹药不是教条——按需启用，把纠错经验写进 AGENTS.md，让每次踩坑都变成团队资产。",
+
+  /* ---------------- 资料来源 ---------------- */
+  sources: [
+    { tag: "OFFICIAL", label: "OpenAI：harness engineering——为编码 agent 造「挽具」的方法论（Ryan Lopopolo）", url: "https://openai.com/index/harness-engineering/" },
+    { tag: "OFFICIAL", label: "OpenAI：Codex 编排的开源规范 Symphony 官方发布", url: "https://openai.com/index/open-source-codex-orchestration-symphony/" },
+    { tag: "GITHUB", label: "openai/symphony：把项目工作变成隔离的自主执行 run（编排规范 SPEC）", url: "https://github.com/openai/symphony" },
+    { tag: "GITHUB", label: "Symphony SPEC 原文（conductor/worker、任务卡格式、交接与验收）", url: "https://raw.githubusercontent.com/openai/symphony/main/SPEC.md" },
+    { tag: "OFFICIAL", label: "Anthropic 官方：Claude Code 最佳实践（验证闭环、CLAUDE.md、子 agent 对抗评审）", url: "https://code.claude.com/docs/en/best-practices" },
+    { tag: "OFFICIAL", label: "Anthropic 工程博客：Claude Code 最佳实践（同主题工程版）", url: "https://www.anthropic.com/engineering/claude-code-best-practices" },
+    { tag: "GITHUB", label: "GitHub 官方博客：@Copilot 在 github.com 核心仓库是「活跃贡献者」", url: "https://github.blog/ai-and-ml/github-copilot/how-copilot-helps-build-the-github-platform/" },
+    { tag: "NEWS", label: "The Verge：Pichai——谷歌超 1/4 新代码由 AI 生成并经工程师验收（2024-10）", url: "https://www.theverge.com/2024/10/29/24282757/google-new-code-generated-ai-q3-2024" },
+    { tag: "NEWS", label: "Chrome Unboxed：Alphabet 首个千亿美元季度，Pichai 称近一半新代码由 AI 生成（2025-10）", url: "https://chromeunboxed.com/some-comments-from-google-ceo-sundar-pichai-about-googles-first-100-billion-quarter/" },
+    { tag: "NEWS", label: "TOI：Cloud Next 2026——Pichai 称 75% 新代码由 AI 生成", url: "https://timesofindia.indiatimes.com/technology/tech-news/google-ceo-sundar-pichai-says-ai-generates-75-codes-at-the-company-why-this-number-matters/articleshow/130451126.cms" },
+    { tag: "NEWS", label: "Business Insider 独家：Google 内部「Claude 有/无阶层」工具裂痕（2026-04）", url: "https://www.businessinsider.com/google-deepmind-ai-tool-divide-internal-tensions-2026-4" },
+    { tag: "NEWS", label: "Engadget：Zuckerberg 预言 AI 将成为「中级工程师」并写出 Meta 大部分代码", url: "https://www.engadget.com/ai/mark-zuckerberg-predicts-ai-will-write-most-of-metas-code-within-12-to-18-months-213851646.html" },
+    { tag: "NEWS", label: "Business Insider 独家：Meta 内部 AI 目标泄露（55% 智能体辅助 / 80% 采用率，未经官方证实）", url: "https://www.businessinsider.com/meta-ai-push-employee-goals-tool-adoption-2-026-3" },
+    { tag: "NEWS", label: "People Matters：微软吊销多数 Claude Code 许可、强制转 GitHub Copilot CLI（2026-05）", url: "https://www.peoplematters.in/news/ai-and-emerging-tech/microsoft-cancels-claude-code-licences-after-engineers-use-it-too-much-49918" },
+    { tag: "NEWS", label: "WION：Codex 在开发者监督下编写了 OpenAI 自身代码的大部分", url: "https://www.wionews.com/technology/openai-s-coding-agent-codex-now-writes-the-majority-of-its-own-code-under-developer-supervision-1765783312631" },
+    { tag: "NEWS", label: "Sam Altman 称 Codex 用于 OpenAI 所有新代码", url: "https://aidatainsider.com/news/sam-atlman-says-codex-used-for-all-new-code-at-openai/" },
+    { tag: "INTERVIEW", label: "Lenny's Newsletter：Codex 产品负责人 Embiricos 谈并行工作流与上下文工程", url: "https://www.lennysnewsletter.com/p/a-full-software-engineering-teammate" },
+    { tag: "BLOG", label: "ZenML：harness engineering——生产环境中为 AI 编码 agent 结构化上下文与护栏", url: "https://www.zenml.io/llmops-database/harness-engineering-structuring-context-and-guardrails-for-ai-coding-agents-in-production" },
+    { tag: "BLOG", label: "ZenML：Jules——并行异步 AI 编码 agent 的开发工作流", url: "https://www.zenml.io/llmops-database/parallel-asynchronous-ai-coding-agents-for-development-workflows" },
+    { tag: "BLOG", label: "ZenML：Uber 软件工厂——70%+ PR 由 AI agent 生成", url: "https://www.zenml.io/llmops-database/building-a-managed-software-factory-with-agentic-ai" },
+    { tag: "BLOG", label: "ZenML：Datadog——生产环境运行数百个自主 agent", url: "https://www.zenml.io/llmops-database/scaling-ai-agents-in-production-building-and-operating-hundreds-of-autonomous-agents" },
+    { tag: "BLOG", label: "无招胜有招：Anthropic 内部专家的 Claude Code 工作流完全拆解（Boris Cherny 分享转述）", url: "https://cloud.tencent.cn/developer/article/2613680" },
+    { tag: "BLOG", label: "Codex 记忆系统迎重大升级：告别上下文压缩，拥抱硬切换机制（Nico Ritschel 披露梳理）", url: "http://www.jimo.studio/blog/codex-memory-system-undergoes-major-redesign/" },
+    { tag: "GITHUB", label: "openai/codex Issue #11805：v0.100.0 硬 90% 压缩阈值钳制", url: "https://github.com/openai/codex/issues/11805" },
+    { tag: "DISCUSS", label: "知乎：如何看待 Codex 取消上下文压缩、改硬切窗口与外部记忆", url: "https://www.zhihu.com/question/2077507444545165165" }
+  ]
+};

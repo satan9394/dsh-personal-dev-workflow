@@ -1,0 +1,247 @@
+/* ============ 主题 tokens（浅色，与调研版一致） ============ */
+:root {
+  --bg: #f4f6fb;
+  --bg2: #ffffff;
+  --panel: rgba(15, 23, 42, 0.035);
+  --panel2: rgba(15, 23, 42, 0.06);
+  --line: rgba(15, 23, 42, 0.09);
+  --line2: rgba(15, 23, 42, 0.18);
+  --txt: #0f172a;
+  --dim: #55627a;
+  --dim2: #8a94a8;
+  --acc1: #0284c7;
+  --acc2: #7c3aed;
+  --acc3: #059669;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --pink: #db2777;
+  --grad: linear-gradient(100deg, #0284c7 0%, #7c3aed 55%, #db2777 100%);
+  --radius: 18px;
+  --radius-sm: 10px;
+  --shadow: 0 16px 44px rgba(15, 23, 42, 0.12);
+  --font: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font);
+  line-height: 1.75;
+  overflow-x: hidden;
+}
+a { color: var(--acc1); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong { color: var(--txt); font-weight: 600; }
+
+/* ============ 顶部导航 ============ */
+.topnav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.topnav-inner {
+  max-width: 1140px; margin: 0 auto; padding: 12px 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.brand { font-weight: 700; letter-spacing: 0.3px; }
+.nav-links { display: flex; gap: 18px; flex-wrap: wrap; }
+.nav-links a { color: var(--dim); font-size: 14px; transition: color 0.2s; }
+.nav-links a:hover { color: var(--acc1); text-decoration: none; }
+
+/* ============ HERO ============ */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 120px 24px 60px;
+  background:
+    radial-gradient(1100px 560px at 50% -10%, rgba(2, 132, 199, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 85% 110%, rgba(124, 58, 237, 0.10), transparent 60%),
+    var(--bg);
+  overflow: hidden;
+}
+#heroCanvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.hero-content { position: relative; z-index: 2; max-width: 860px; }
+.hero-kicker {
+  color: var(--acc1); font-size: 13px; letter-spacing: 3px; text-transform: uppercase;
+  margin-bottom: 18px;
+}
+.hero-title {
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.25;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 22px;
+}
+.hero-title .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero-sub {
+  font-size: clamp(15px, 2.2vw, 19px);
+  color: var(--dim);
+  max-width: 680px;
+  margin: 0 auto 34px;
+}
+.hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 26px; }
+.btn {
+  display: inline-block; padding: 13px 26px; border-radius: 999px;
+  font-size: 15px; font-weight: 600; transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn.primary { background: var(--grad); color: #fff; box-shadow: 0 8px 26px rgba(2, 132, 199, 0.30); }
+.btn.primary:hover { transform: translateY(-2px); text-decoration: none; box-shadow: 0 12px 34px rgba(2, 132, 199, 0.42); }
+.btn.ghost { border: 1px solid var(--line2); color: var(--txt); background: rgba(255,255,255,0.6); }
+.btn.ghost:hover { border-color: var(--acc1); color: var(--acc1); transform: translateY(-2px); text-decoration: none; }
+.hero-hint { color: var(--dim2); font-size: 13px; animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+
+/* ============ Section 通用 ============ */
+.section { max-width: 1140px; margin: 0 auto; padding: 96px 24px; }
+.section-head { margin-bottom: 48px; max-width: 760px; }
+.kicker { color: var(--acc2); font-size: 13px; letter-spacing: 2.5px; text-transform: uppercase; margin-bottom: 10px; }
+.section h2 {
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 800; letter-spacing: -0.3px;
+  margin-bottom: 14px;
+  background: linear-gradient(120deg, #0f172a 20%, var(--acc1) 80%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.section-desc { color: var(--dim); font-size: 15.5px; }
+.note { color: var(--dim2); font-size: 13px; margin-top: 18px; }
+
+/* ============ 五原则 ============ */
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.prin {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 22px 20px;
+  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+.prin:hover { transform: translateY(-5px); border-color: var(--line2); box-shadow: var(--shadow); }
+.prin .prin-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--grad); color: #fff; font-weight: 800; font-size: 14px;
+  margin-bottom: 12px;
+}
+.prin h3 { font-size: 16px; margin-bottom: 6px; }
+.prin p { color: var(--dim); font-size: 13.5px; }
+
+/* ============ 生命周期 stepper ============ */
+.stepper { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.step-chip {
+  flex: 1 1 140px;
+  padding: 14px 16px; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg2);
+  text-align: center; transition: all 0.2s;
+}
+.step-chip:hover { border-color: var(--acc1); transform: translateY(-2px); }
+.step-chip.active { background: var(--grad); color: #fff; border-color: transparent; }
+.step-chip .sc-num { font-size: 12px; opacity: 0.85; display: block; }
+.step-chip .sc-name { font-weight: 700; font-size: 15px; }
+.step-detail {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 26px 28px;
+  min-height: 120px;
+  animation: fadeUp 0.3s ease;
+}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.step-detail .sd-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.step-detail .sd-head h3 { font-size: 20px; }
+.step-detail .sd-head .sd-src { color: var(--acc2); font-size: 12.5px; }
+.step-detail .sd-body { color: var(--dim); font-size: 15px; }
+.step-detail .sd-out { margin-top: 14px; color: var(--acc3); font-size: 13.5px; }
+
+/* ============ 工具分工 ============ */
+.tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.tool {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 16px 18px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.tool .tl-icon { font-size: 20px; line-height: 1.3; }
+.tool .tl-role { font-weight: 700; font-size: 14.5px; }
+.tool .tl-tool { color: var(--acc1); font-size: 13px; font-weight: 600; }
+.tool .tl-desc { color: var(--dim); font-size: 12.5px; margin-top: 2px; }
+
+/* ============ 规模适配 ============ */
+.scales { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.scale {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 26px 24px;
+  transition: transform 0.25s, border-color 0.25s;
+}
+.scale:hover { transform: translateY(-5px); border-color: var(--line2); }
+.scale .sc-tag {
+  display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  color: #fff; background: var(--grad); border-radius: 6px; padding: 3px 9px; margin-bottom: 12px;
+}
+.scale h3 { font-size: 18px; margin-bottom: 10px; }
+.scale p { color: var(--dim); font-size: 13.5px; }
+.scale ul { margin: 10px 0 0 18px; color: var(--dim); font-size: 13px; }
+.scale li { margin-bottom: 4px; }
+
+/* ============ 避坑 ============ */
+.pitfalls { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.pitfall {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 24px 22px;
+  transition: transform 0.25s, border-color 0.25s;
+}
+.pitfall:hover { transform: translateY(-5px); border-color: var(--line2); }
+.pitfall .pf-bad { color: var(--danger); font-weight: 700; font-size: 15.5px; margin-bottom: 6px; }
+.pitfall .pf-bad-desc { color: var(--dim); font-size: 13px; margin-bottom: 14px; }
+.pitfall .pf-good { color: var(--acc3); font-weight: 700; font-size: 14px; }
+.pitfall .pf-good-desc { color: var(--dim); font-size: 13px; }
+
+/* ============ 开场动作 ============ */
+.kickoff { display: flex; flex-direction: column; gap: 12px; margin-bottom: 40px; }
+.ko-step {
+  display: grid; grid-template-columns: 52px 1fr; gap: 16px;
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 22px;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.ko-step:hover { border-color: var(--acc1); transform: translateX(4px); }
+.ko-step .ko-num {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: var(--grad); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800;
+}
+.ko-step .ko-title { font-weight: 700; font-size: 16px; }
+.ko-step .ko-desc { color: var(--dim); font-size: 14px; }
+.memory-note {
+  background: linear-gradient(160deg, rgba(2, 132, 199, 0.08), rgba(124, 58, 237, 0.07));
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  padding: 28px 30px;
+}
+.memory-note h3 { font-size: 18px; margin-bottom: 8px; }
+.memory-note p { color: var(--dim); font-size: 14.5px; }
+
+/* ============ Footer ============ */
+.footer {
+  border-top: 1px solid var(--line);
+  padding: 40px 24px; text-align: center;
+  color: var(--dim2); font-size: 13px;
+}
+
+/* ============ 滚动进场 ============ */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.visible { opacity: 1; transform: none; }
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #c3ccdd; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #aab6cc; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+}

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>personal-dev-workflow · v3 精瘦版可视化</title>
+<meta name="description" content="个人开发工作流 skill v3（67 行）的可视化：五原则 / 六步循环 / 规则纪律 / 上下文与成本 / 规模适配 / 自查清单">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="topnav">
+  <div class="topnav-inner">
+    <span class="brand">🧭 personal-dev-workflow · v3</span>
+    <nav class="nav-links">
+      <a href="#principles">五原则</a>
+      <a href="#lifecycle">六步循环</a>
+      <a href="#rules">规则纪律</a>
+      <a href="#context">上下文与成本</a>
+      <a href="#scales">规模</a>
+      <a href="#checklist">自查清单</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ HERO：Three.js 3D 指挥+Worker ============ -->
+<section class="hero" id="hero">
+  <div id="hero3d"></div>
+  <canvas id="heroCanvas"></canvas>
+  <div class="hero-content">
+    <p class="hero-kicker">skill 可视化 · v3 精瘦版 · 67 行</p>
+    <h1 class="hero-title">个人开发工作流</h1>
+    <p class="hero-sub">
+      <strong>一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环。</strong>
+      融合 OpenAI Codex（harness engineering/Symphony）、Anthropic（Claude Code 最佳实践）与 DSH 实测；
+      v3 已去冗余，147 行 → <strong>67 行</strong>，每行都有出处。
+    </p>
+    <div class="lean-strip">
+      <div class="lean-item"><span class="lean-num">147 → 67</span><span class="lean-label">行（-54%）</span></div>
+      <div class="lean-item"><span class="lean-num">11 → 9</span><span class="lean-label">节</span></div>
+      <div class="lean-item"><span class="lean-num">×1</span><span class="lean-label">冗余关键词（每项仅 1 次）</span></div>
+      <div class="lean-item"><span class="lean-num">100%</span><span class="lean-label">规则有出处</span></div>
+    </div>
+    <div class="hero-cta">
+      <a class="btn primary" href="#lifecycle">看六步循环</a>
+      <a class="btn ghost" href="#principles">先看五原则</a>
+    </div>
+    <p class="hero-hint">↓ 滚动探索 · 3D 场景加载失败会自动回退到 2D</p>
+  </div>
+</section>
+
+<!-- ============ 核心五原则 ============ -->
+<section class="section" id="principles">
+  <div class="section-head">
+    <p class="kicker">核心五原则</p>
+    <h2>五条原则，每条一句</h2>
+    <p class="section-desc">原则层只保留一句可执行的话——这正是 v3 与"越搞越庞杂"的区别。</p>
+  </div>
+  <div class="principles" id="principlesGrid"></div>
+</section>
+
+<!-- ============ 六步循环 ============ -->
+<section class="section" id="lifecycle">
+  <div class="section-head">
+    <p class="kicker">六步循环</p>
+    <h2>一张任务卡的一生</h2>
+    <p class="section-desc">点环形图上的节点看细节。循环回到第 1 步：复盘产出的教训会进入下一张卡的拆卡依据。</p>
+  </div>
+  <div class="cycle-wrap">
+    <div class="cycle-svg" id="cycleSvg"></div>
+    <div class="step-detail" id="stepDetail"></div>
+  </div>
+</section>
+
+<!-- ============ 规则文件纪律 ============ -->
+<section class="section" id="rules">
+  <div class="section-head">
+    <p class="kicker">规则文件纪律</p>
+    <h2>AGENTS.md / CLAUDE.md 三条</h2>
+    <p class="section-desc">规则文件不是越厚越好——100 行原则、犯错驱动、建议 vs 约束。</p>
+  </div>
+  <div class="rules" id="rulesGrid"></div>
+</section>
+
+<!-- ============ 上下文与成本 ============ -->
+<section class="section" id="context">
+  <div class="section-head">
+    <p class="kicker">上下文与成本</p>
+    <h2>四个约束</h2>
+  </div>
+  <div class="context" id="contextGrid"></div>
+</section>
+
+<!-- ============ 规模适配 ============ -->
+<section class="section" id="scales">
+  <div class="section-head">
+    <p class="kicker">规模适配</p>
+    <h2>同一套循环，三档复杂度</h2>
+    <p class="section-desc">小项目别搞仪式，大项目别省结构。</p>
+  </div>
+  <div class="scales" id="scalesGrid"></div>
+</section>
+
+<!-- ============ 模板与参考 ============ -->
+<section class="section" id="templates">
+  <div class="section-head">
+    <p class="kicker">模板与参考</p>
+    <h2>直接用，不用背</h2>
+  </div>
+  <div class="templates" id="templatesGrid"></div>
+</section>
+
+<!-- ============ 自查清单 ============ -->
+<section class="section" id="checklist">
+  <div class="section-head">
+    <p class="kicker">自查清单</p>
+    <h2>每张卡收尾核对</h2>
+  </div>
+  <div class="checklist" id="checklistBox"></div>
+  <p class="note">v3 全文 67 行见 <code>.dsh/skills/personal-dev-workflow/SKILL.md</code>；本页数据与之一致。</p>
+</section>
+
+<footer class="footer">
+  <p>personal-dev-workflow v3 可视化 · 精瘦 = 每行都有用 · 生成于 2026-09</p>
+</footer>
+
+<!-- Three.js（CDN，加载失败自动回退 2D Canvas） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
