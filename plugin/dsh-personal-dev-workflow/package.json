@@ -1,0 +1,41 @@
+{
+  "name": "dsh-personal-dev-workflow",
+  "version": "0.3.0",
+  "description": "个人开发工作流 v3：一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环。融合 OpenAI Codex（harness engineering/Symphony）、Anthropic（Claude Code 最佳实践）、DeepSeek Harness 实测，附任务卡/SPEC/验证模板。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "skill",
+    "workflow",
+    "开发流程",
+    "任务卡"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "yaml": "^2.4.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

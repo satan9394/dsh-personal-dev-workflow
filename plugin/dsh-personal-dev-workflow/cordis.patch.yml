@@ -1,0 +1,4 @@
+# dsh-personal-dev-workflow bundle: registers packaged skills/personal-dev-workflow on ctx.skills.
+- insert:
+    - id: dsh-personal-dev-workflow
+      name: dsh-personal-dev-workflow
