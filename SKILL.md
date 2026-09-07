@@ -1,7 +1,7 @@
 ---
 slug: personal-dev-workflow
 name: personal-dev-workflow
-displayName: 个人开发工作流
+displayName: Personal Dev Workflow
 description: |
   个人开发工作流：融合 OpenAI Codex（harness engineering/Symphony）、Anthropic（Claude Code 最佳实践）、
   DeepSeek Harness 实测。当用户要做项目开发、编码任务、开工、拆任务卡、实现功能、修 bug、写代码、
@@ -12,7 +12,7 @@ metadata:
 version: "0.3.0"
 ---
 
-# 个人开发工作流 v3（personal-dev-workflow）
+# Personal Dev Workflow v3（personal-dev-workflow）
 
 > 一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环。人只做提需求与拍板，搬运与转述全部自动化。
 > 依据与出处：`references/framework.md`（可选阅读）。
