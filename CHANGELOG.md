@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow 
 - `scripts/sync-copies.mjs` — regenerates every packaged copy from `skills/`, which is the single source of truth.
 - `CHANGELOG.md`, `.gitattributes`.
 - Repository topics and description for discoverability.
+- GitHub Packages publishing: `@satan9394/dsh-personal-dev-workflow` via `.github/workflows/publish-package.yml`
+  (runs on release published, or manually via workflow dispatch; validates skills before `npm publish`).
 
 ## [0.3.0] — 2026-09-07
 

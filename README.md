@@ -31,6 +31,7 @@ Other ways:
 | Manual copy (Claude Code) | copy `skills/personal-dev-workflow/` into `~/.claude/skills/` |
 | DSH bundle plugin | `dsh plugin --profile web add link:<this repo>/plugin/dsh-personal-dev-workflow` |
 | Tencent SkillHub | `skillhub install personal-dev-workflow --namespace user_d684b111` (also `personal-dev-workflow-zh`) |
+| GitHub Packages (npm) | `npm install @satan9394/dsh-personal-dev-workflow --registry=https://npm.pkg.github.com` — requires a GitHub token with `read:packages` (GitHub Packages authenticates even for public packages) |
 
 ## The six-step loop
 
