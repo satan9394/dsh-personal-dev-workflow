@@ -27,10 +27,16 @@
 - [ ] Browser screenshot checked for layout (no overflow / overlap)
 - [ ] Responsive (desktop / tablet / mobile)
 
-## Circuit breaker
-- [ ] No problem survived more than 3 fix attempts (if it did: stop, clear the context, re-dispatch or switch executors)
+## Circuit breaker & repair budget
+- [ ] Inside the card: the executor did not retry the same problem more than 3 times (then it stopped and reported)
+- [ ] Conductor-side: at most 1 repair re-dispatch for this card; a second FAIL → `BLOCKED`
+
+## Budget & stop state
+- [ ] `RUN_STATE.md` counters updated (epochs, cards completed, repairs, subagents)
+- [ ] If a budget is exhausted or the Mission is blocked: `RUN_STATE.md` written and the run stopped (stopping is a normal outcome, not a failure)
 
 ## Wrap-up
 - [ ] Lessons / pitfalls written into AGENTS.md ("don't do this")
 - [ ] Decisions written into docs/
-- [ ] Card status updated; user has accepted
+- [ ] Card status updated; objective gates pass → auto-accepted (no per-card human sign-off)
+- [ ] Escalated to the human only via a listed exception (semantics / irreversible / blocked / budget)

@@ -3,6 +3,32 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.4.0] — 2026-09-12 — Bounded Autonomy
+
+Closes the gap that let an unbounded run happen: the loop governed *one card*, nothing governed *how many cards*.
+
+### Added
+- `SKILL.md` §**Bounded autonomy** (the outer controller): Mission envelope · finite workset · numeric budgets ·
+  audit/discovery has no execution authority · auto-accept with escalation by exception · stop-and-handoff ·
+  one control policy per project.
+- `references/production-control.md` — Mission envelope, mode separation (development vs audit), finite workset,
+  default budgets, stop conditions, the four human-escalation triggers, resume protocol, anti-patterns.
+- `references/run-state-template.md` — the handoff file written at start-of-run and before every stop, so a new
+  context resumes by reading it instead of re-reading history.
+- Core principle #6: **backlog is memory, not a queue**.
+
+### Changed
+- Step 5 (Accept) is now: gates pass + low risk → auto-accept and continue; FAIL → one repair; FAIL again → `BLOCKED`.
+  The per-card human sign-off is gone; humans handle the four listed exceptions only.
+- Context & cost: budgets are numbers (not "be economical"); the periodic adversarial review runs in Audit Mode,
+  which reports and stops.
+- Scale: long-running projects use finite epochs + `RUN_STATE.md` resume + 2 workers (max 3); a goal only continues
+  an already-defined Mission and must not be used to keep discovering new Missions.
+- Task-card template: adds `Mission` and `Source` (planned / blocker / human-requested); acceptance section now
+  PASS → auto-merge, FAIL → 1 repair, FAIL again → BLOCKED, plus the escalation triggers.
+- Verify checklist: adds budget/stop-state checks and the conductor-side repair budget; wrap-up no longer requires
+  per-card human acceptance.
+
 ## [0.3.1] — 2026-09-07
 
 ### Changed

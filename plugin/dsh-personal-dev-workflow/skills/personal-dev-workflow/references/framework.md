@@ -48,3 +48,20 @@ Order: instructions + basic feedback first (make the AI able to run tests) → a
 | Verification loop + objective gates | Anthropic official best practices; Codex verifiability ("startup under 800ms" as an executable target) |
 | Proof of work in handoff | OpenAI Symphony review packet (CI / PR review / demo video) |
 | Human decides & accepts only | OpenAI: "Humans steer, agents execute."; Symphony: "manage work instead of supervising agents" |
+
+## Why bounded autonomy (v0.4.0)
+
+The six-step loop makes **one card** reliable. It says nothing about how many cards may exist, and that is exactly where an unbounded run comes from: an open-ended prompt ("keep improving the product") stacked on top of an auto-continuing goal, with audits feeding new cards back into execution forever.
+
+- Anthropic's long-task guidance separates *structured handoff* from *one context doing everything*: state is written down, the context resets, the next run resumes from the file. `RUN_STATE.md` is that handoff.
+- Anthropic's Planner → Generator → Evaluator split is about **separation of duties**, not about unlimited agent count — so the default here is 2 workers (max 3), not 3–5.
+- OpenAI's delegation guidance is the same shape: delegate low-risk, repeatable work; keep ambiguous design and high-risk changes with a human. Hence *auto-accept by default, escalate by exception*.
+- Audit/Discovery is deliberately a **separate mode with no execution authority**: it produces findings, writes them to the backlog, and stops. Backlog is memory, not a queue.
+- Default budgets (epochs 3 · cards/epoch 6 · workset 8 · workers 2 · repairs 1 · nesting 1 · research 1) exist so "be economical" becomes a number the agent can check rather than an intention it can ignore. Stopping when a budget is spent is a normal outcome, not a failure.
+
+| Also from | Source |
+|---|---|
+| Structured handoff + context reset for long tasks | Anthropic long-running-agent guidance (`/clear`, checkpoints, fresh-context verifiers) |
+| Separate planner / generator / evaluator roles | Anthropic multi-agent research; the grader is never the doer |
+| Delegate repeatable work, keep ambiguous work human | OpenAI's guidance for using coding agents in production |
+| Board + isolated runs as the control plane | OpenAI Symphony (one isolated workspace per issue) |

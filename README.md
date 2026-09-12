@@ -2,16 +2,16 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://img.shields.io/badge/install-npx%20skills%20add%20satan9394%2Fdsh--personal--dev--workflow-2ea44f)](https://skills.sh)
-[![version](https://img.shields.io/badge/version-0.3.1-informational)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.4.0-informational)](CHANGELOG.md)
 [![agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20DSH%20%7C%20OpenCode-8a2be2)](#install)
 
-> **One conductor + isolated workers + file-based memory + a verification loop.**
-> The human only raises requirements and signs off; all hauling and relaying is automated.
+> **One conductor + isolated workers + file-based memory + a verification loop + bounded autonomy.**
+> The human raises requirements and handles exceptions; routine accept-and-continue decisions are automatic.
 >
-> 中文：**一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环**；人只做提需求与拍板。
+> 中文：**一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环 + 有限自治**；人负责提需求与处理例外。
 > 核心是任务卡六步循环：拆卡 → 派活 → 交证 → 验证 → 验收 → 复盘。
 
-Lean by design: the skill body is **67 lines** (down from 147), every rule has a traceable source, and the rationale lives in an optional reference instead of the main file.
+Lean by design: the skill body is **85 lines**, every rule has a traceable source, and the rationale lives in optional references instead of the main file. The six-step loop governs *how one card gets done*; the **bounded autonomy** section governs *how many cards may exist and when the run must stop* — numeric budgets, explicit stop conditions, and a `RUN_STATE.md` handoff so a long run can always stop cleanly and resume from a file.
 
 ## Install (30 seconds)
 
@@ -38,30 +38,44 @@ Other ways:
 1. **Break down** — converge a fuzzy requirement to one page (Problem / assumptions / MVP / Not Doing); write a SPEC for big features; explore unfamiliar code first (3–5 focused searches, then stop).
 2. **Dispatch** — one card → one isolated executor (subagent, or `codex exec`). Every card states constraints (what must NOT change) and the evidence expected. Three questions: who coordinates, is it independent, will it touch the same files?
 3. **Proof of work** — change summary + diff + tests + screenshots, citing its source.
-4. **Verify** — objective gates (executable criteria, not "feels done"); default suspicion; Review five things; a fresh-context reviewer for large changes; hard stop after 3 failed fixes.
-5. **Accept** — the human picks one: merge / rework / redirect.
+4. **Verify** — objective gates (executable criteria, not "feels done"); default suspicion; Review five things; a fresh-context reviewer for large changes; inside a card the same problem is never retried more than 3 times.
+5. **Accept** — gates pass + low risk → auto-accept and continue to the next card; FAIL → one repair; FAIL again → `BLOCKED`.
 6. **Retro** — lessons into `AGENTS.md`, automate anything repeated 3×, garbage-collect stale rules.
+
+## Bounded autonomy (v0.4.0)
+
+The loop above keeps one card reliable. This layer keeps the whole run bounded, because that is where unbounded runs come from:
+
+- **Mission envelope** — one run serves one Mission with an explicit Definition of Done; the agent picks the next card *inside* it and never enlarges it. **Backlog is memory, not a queue.**
+- **Default budgets** — epochs ≤ 3 · cards per epoch ≤ 6 · workset ≤ 8 · workers 2 (max 3) · repairs per card 1 · evaluator 1 · subagent depth 1 · research pass 1.
+- **Audit / discovery has no execution authority** — findings go to `DEFERRED_BACKLOG` and the run stops there.
+- **Auto-accept, escalate by exception** — humans are asked only for product-semantics changes, irreversible/high-risk operations, a blocked Mission, or a budget exhausted with work unfinished.
+- **Stop ≠ failure** — budgets spent means write `RUN_STATE.md` and stop; the next run resumes from that file instead of re-reading history.
+- **One control policy per project** — this skill owns the development policy, `AGENTS.md` holds project-local rules, a goal is only an execution mechanism. Never stack a second open-ended "keep improving" prompt on top.
+
+Full rules: `references/production-control.md` · state file: `references/run-state-template.md`.
 
 ## Bilingual
 
 - **English (default):** `skills/personal-dev-workflow/`
 - **中文：** `skills/personal-dev-workflow-zh/`
 
-Both ship with the same four templates: task card, SPEC, verification checklist, and an optional `framework.md` (five-component model, sources, cost numbers, mapping to how top AI companies work).
+Both ship with the same six references: task card, SPEC, verification checklist, production control, run-state template, and an optional `framework.md` (five-component model, sources, cost numbers, mapping to how top AI companies work).
 
 ## Repository layout
 
 ```
 dsh-personal-dev-workflow/
 ├── skills/
-│   ├── personal-dev-workflow/         # English, 67-line body + references/
+│   ├── personal-dev-workflow/         # English, 85-line body + 6 references/
 │   └── personal-dev-workflow-zh/      # Chinese variant
 ├── taskcard-cli.js                    # zero-dependency CLI for tasks/ cards (copy to your project root)
 ├── plugin/dsh-personal-dev-workflow/  # DSH bundle plugin (bundles both skills)
 ├── dist/                              # publish packages for SkillHub (en / zh)
 ├── demos/                             # static visualizations (research / workflow / this skill)
-├── scripts/validate-skills.mjs        # dependency-free frontmatter + reference check
-└── .github/workflows/validate-skills.yml
+├── scripts/validate-skills.mjs        # frontmatter + reference + copy-consistency checks
+├── scripts/sync-copies.mjs            # regenerate plugin/dist copies from skills/
+└── .github/workflows/                 # validate-skills.yml · publish-package.yml
 ```
 
 ## Companion tools

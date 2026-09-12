@@ -3,9 +3,11 @@
 ```markdown
 # [Task title]
 
-- Status: todo (todo / in_progress / in_review / merged / rejected)
+- Status: todo (todo / in_progress / blocked / merged)
 - Priority: P0/P1/P2
 - Created: YYYY-MM-DD
+- Mission: [the one-sentence Mission this card serves]
+- Source: planned | blocker | human-requested
 - Related cards: (optional)
 
 ## Goal
@@ -34,7 +36,12 @@
 - [ ] Test results provided
 - [ ] Screenshots / demo provided
 
-## Acceptance decision (filled by the conductor)
-- [ ] merge / rework / redirect
+## Acceptance decision (filled by the Evaluator / Conductor)
+- **PASS** (objective gates pass + low risk) → auto-accept, commit, continue to the next card
+- **FAIL** → exactly one repair re-dispatch
+- **FAIL again** → status `BLOCKED`
+- Escalate to the human only for: product-semantics change · irreversible/high-risk operation ·
+  Mission blocked · budget exhausted with work unfinished
+- Result:
 - Notes:
 ```
