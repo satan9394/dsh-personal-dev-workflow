@@ -1,0 +1,46 @@
+{
+  "name": "@satan9394/dsh-personal-dev-workflow",
+  "version": "0.3.1",
+  "description": "Lean bilingual (EN/CN) personal development workflow skill for coding agents: one conductor + isolated workers + file-based memory + a verification loop; six-step task-card cycle.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/satan9394/dsh-personal-dev-workflow.git"
+  },
+  "homepage": "https://github.com/satan9394/dsh-personal-dev-workflow#readme",
+  "bugs": {
+    "url": "https://github.com/satan9394/dsh-personal-dev-workflow/issues"
+  },
+  "keywords": [
+    "agent-skills",
+    "skill",
+    "claude-code",
+    "codex",
+    "cursor",
+    "dsh",
+    "workflow",
+    "task-card",
+    "bilingual"
+  ],
+  "files": [
+    "skills/",
+    "plugin/",
+    "dist/",
+    "scripts/",
+    "taskcard-cli.js",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "validate": "node scripts/validate-skills.mjs",
+    "sync": "node scripts/sync-copies.mjs"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
