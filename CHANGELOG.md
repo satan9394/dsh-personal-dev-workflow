@@ -12,7 +12,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow 
 - `personal-dev-workflow-zh` now has its own skill name matching its folder (previously shared the English name).
 
 ### Added
-- `scripts/validate-skills.mjs` + GitHub Actions workflow validating frontmatter and referenced files on every push.
+- `scripts/validate-skills.mjs` + GitHub Actions workflow validating frontmatter, referenced files, and
+  byte-identical packaged copies (plugin bundle and `dist/` packages) on every push.
+- `scripts/sync-copies.mjs` — regenerates every packaged copy from `skills/`, which is the single source of truth.
 - `CHANGELOG.md`, `.gitattributes`.
 - Repository topics and description for discoverability.
 
