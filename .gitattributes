@@ -1,0 +1,17 @@
+# Normalize line endings in the repository so diffs stay clean across platforms.
+* text=auto eol=lf
+
+# Explicitly binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.zip binary
+
+# Shell/CLI scripts should keep LF
+*.sh text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
