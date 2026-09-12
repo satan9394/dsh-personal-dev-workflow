@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /**
- * Dependency-free validator for this repository's skills.
+ * Dependency-free validator for this repository.
  *
- * Checks, for every directory under skills/:
+ * A. For every directory under skills/ (the single source of truth):
  *   1. SKILL.md exists and opens with a YAML frontmatter block.
  *   2. `name` is present and matches the folder name.
  *   3. `description` is present and non-empty; a single-line value containing
  *      ": " must be quoted (unquoted scalars break strict YAML parsers).
  *   4. Every `references/<file>` mentioned in the body exists on disk.
  *
+ * B. Every packaged copy (plugin bundle, dist publish packages) must match the
+ *    canonical skill byte-for-byte: no missing files, no modified files, no
+ *    extra files. Run `node scripts/sync-copies.mjs` to regenerate copies.
+ *
  * Exit code 0 = all good, 1 = at least one problem (printed).
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,8 +25,19 @@ const skillsDir = join(repoRoot, 'skills');
 const failures = [];
 const checked = [];
 
-function fail(skill, message) {
-  failures.push(`${skill}: ${message}`);
+function fail(scope, message) {
+  failures.push(`${scope}: ${message}`);
+}
+
+function listFiles(dir, base = dir) {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listFiles(full, base));
+    else out.push(relative(base, full).replace(/\\/g, '/'));
+  }
+  return out;
 }
 
 function checkSkill(skill) {
@@ -86,6 +101,29 @@ function checkSkill(skill) {
   }
 }
 
+function checkCopy(label, copyDir, skill) {
+  const canonicalDir = join(skillsDir, skill);
+  const scope = `${label}:${skill}`;
+
+  for (const rel of listFiles(canonicalDir)) {
+    const copyFile = join(copyDir, rel);
+    if (!existsSync(copyFile)) {
+      fail(scope, `copy is missing ${rel} (run scripts/sync-copies.mjs)`);
+      continue;
+    }
+    if (!readFileSync(join(canonicalDir, rel)).equals(readFileSync(copyFile))) {
+      fail(scope, `copy differs from canonical: ${rel} (run scripts/sync-copies.mjs)`);
+    }
+  }
+
+  for (const rel of listFiles(copyDir)) {
+    if (!existsSync(join(canonicalDir, rel))) {
+      fail(scope, `copy has an extra file: ${rel}`);
+    }
+  }
+}
+
+// --- A. canonical skills ---
 for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   const before = failures.length;
@@ -93,12 +131,37 @@ for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
   if (failures.length === before) checked.push(entry.name);
 }
 
-for (const skill of checked) console.log(`ok   ${skill}`);
+// --- B. packaged copies ---
+const copyTargets = [
+  {
+    label: 'plugin',
+    dir: join(repoRoot, 'plugin', 'dsh-personal-dev-workflow', 'skills'),
+    skills: ['personal-dev-workflow', 'personal-dev-workflow-zh'],
+    nested: true,
+  },
+  { label: 'dist-en', dir: join(repoRoot, 'dist', 'skillhub-pkg-en'), skills: ['personal-dev-workflow'], nested: false },
+  { label: 'dist-zh', dir: join(repoRoot, 'dist', 'skillhub-pkg-zh'), skills: ['personal-dev-workflow-zh'], nested: false },
+];
+
+for (const target of copyTargets) {
+  for (const skill of target.skills) {
+    const copyDir = target.nested ? join(target.dir, skill) : target.dir;
+    if (!existsSync(copyDir)) {
+      fail(`${target.label}:${skill}`, 'packaged copy directory is missing');
+      continue;
+    }
+    checkCopy(target.label, copyDir, skill);
+  }
+}
+
+// --- report ---
+for (const skill of checked) console.log(`ok   canonical ${skill}`);
 for (const problem of failures) console.error(`FAIL ${problem}`);
 
-const total = checked.length + new Set(failures.map((f) => f.split(':')[0])).size;
+const failedScopes = new Set(failures.map((f) => f.split(':')[0]));
+const total = checked.length + failedScopes.size;
 if (failures.length > 0) {
-  console.error(`\n${failures.length} problem(s) across ${total} skill(s).`);
+  console.error(`\n${failures.length} problem(s) across ${total} scope(s).`);
   process.exit(1);
 }
-console.log(`\nAll ${checked.length} skill(s) valid.`);
+console.log(`\nAll ${checked.length} canonical skill(s) and ${copyTargets.length} packaged copy set(s) valid.`);

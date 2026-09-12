@@ -80,7 +80,8 @@ The CLI anchors to its own directory — copy it into your project root. `demos/
 
 This repo practices what the skill preaches:
 
-- `node scripts/validate-skills.mjs` (also run in CI) checks that each skill's frontmatter is valid YAML, that `name` matches its folder, and that every `references/...` file mentioned in the body exists.
+- `node scripts/validate-skills.mjs` (also run in CI) checks that each skill's frontmatter is valid, that `name` matches its folder, that every `references/...` file mentioned in the body exists, and that each packaged copy (plugin bundle, `dist/` packages) matches the canonical `skills/` source byte-for-byte.
+- `node scripts/sync-copies.mjs` regenerates those copies from `skills/` in one command — `skills/` is the single source of truth, and CI fails on any drift.
 - `npx skills add satan9394/dsh-personal-dev-workflow --list` must discover both skills.
 - The workflow itself was exercised end-to-end on a real project (task-card CLI): cards → isolated executor → proof of work → verification → acceptance → retro.
 
