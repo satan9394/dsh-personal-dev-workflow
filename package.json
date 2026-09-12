@@ -1,9 +1,9 @@
 {
   "name": "@satan9394/dsh-personal-dev-workflow",
-  "version": "0.4.0",
-  "description": "Lean bilingual (EN/CN) personal development workflow skill for coding agents: one conductor + isolated workers + file-based memory + a verification loop; six-step task-card cycle.",
+  "version": "0.4.1",
+  "description": "Lean bilingual (EN/CN) personal development workflow skill for coding agents: one conductor + isolated workers + file-based memory + a verification loop, inside bounded autonomy; a six-step task-card cycle with numeric budgets and explicit stop conditions.",
   "license": "MIT",
-  "type": "module",
+  "type": "commonjs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/satan9394/dsh-personal-dev-workflow.git"

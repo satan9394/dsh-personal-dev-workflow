@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://img.shields.io/badge/install-npx%20skills%20add%20satan9394%2Fdsh--personal--dev--workflow-2ea44f)](https://skills.sh)
-[![version](https://img.shields.io/badge/version-0.4.0-informational)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.4.1-informational)](CHANGELOG.md)
 [![agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20DSH%20%7C%20OpenCode-8a2be2)](#install)
 
 > **One conductor + isolated workers + file-based memory + a verification loop + bounded autonomy.**
@@ -98,7 +98,7 @@ This repo practices what the skill preaches:
 - `node scripts/validate-skills.mjs` (also run in CI) checks that each skill's frontmatter is valid, that `name` matches its folder, that every `references/...` file mentioned in the body exists, and that each packaged copy (plugin bundle, `dist/` packages) matches the canonical `skills/` source byte-for-byte.
 - `node scripts/sync-copies.mjs` regenerates those copies from `skills/` in one command — `skills/` is the single source of truth, and CI fails on any drift.
 - `npx skills add satan9394/dsh-personal-dev-workflow --list` must discover both skills.
-- The workflow itself was exercised end-to-end on a real project (task-card CLI): cards → isolated executor → proof of work → verification → acceptance → retro.
+- The workflow itself was exercised end-to-end on real projects: a task-card CLI (cards → isolated executor → proof of work → verification → acceptance → retro), and a **three-run bounded-autonomy test** where the controller fired for real — five cards auto-accepted with zero per-card sign-off, both stop conditions observed (budget exhausted, DoD met), audit findings held in the backlog, and a resumed run continuing from `RUN_STATE.md` alone. Case study: [`docs/case-study-bounded-autonomy.md`](docs/case-study-bounded-autonomy.md) · runnable evidence: [`docs/evidence/runstate-cli/`](docs/evidence/runstate-cli/).
 
 ## Sources
 

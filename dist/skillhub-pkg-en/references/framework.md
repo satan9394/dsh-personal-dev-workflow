@@ -65,3 +65,5 @@ The six-step loop makes **one card** reliable. It says nothing about how many ca
 | Separate planner / generator / evaluator roles | Anthropic multi-agent research; the grader is never the doer |
 | Delegate repeatable work, keep ambiguous work human | OpenAI's guidance for using coding agents in production |
 | Board + isolated runs as the control plane | OpenAI Symphony (one isolated workspace per issue) |
+
+Worked example: a three-run test on a real project (five cards auto-accepted, both stop conditions observed, audit findings held in the backlog, a run resumed from `RUN_STATE.md` alone) — `docs/case-study-bounded-autonomy.md`, runnable evidence in `docs/evidence/runstate-cli/`.

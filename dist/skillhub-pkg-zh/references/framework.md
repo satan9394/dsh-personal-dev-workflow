@@ -65,3 +65,5 @@ Harness 管 agent 单次运行的武装：给哪些工具、允许哪些动作�
 | Planner / Generator / Evaluator 角色分离 | Anthropic 多智能体研究；打分的人不能是干活的人 |
 | 可重复工作委派、模糊工作留给人 | OpenAI 关于生产环境使用编码 agent 的指引 |
 | 看板 + 隔离运行即控制面 | OpenAI Symphony（每个 issue 一个隔离工作区） |
+
+实战样例：在真项目上跑了三轮（5 张卡自动合入、两种停止条件都触发过、审计发现只进 backlog、某轮仅凭 `RUN_STATE.md` 恢复继续）——见 `docs/case-study-bounded-autonomy.md`，可复跑证据在 `docs/evidence/runstate-cli/`。

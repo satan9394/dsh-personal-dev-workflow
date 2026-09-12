@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.4.1] — 2026-09-12
+
+### Fixed
+- Root `package.json` declared `"type": "module"`, which made every `.js` file in the repository ESM and broke the
+  CommonJS entry points: `node taskcard-cli.js …` failed with `require is not defined`, and so did the archived
+  evidence CLI. The field is now `"commonjs"`, matching what the `.js` files actually are; the repository's ESM
+  tooling (`scripts/*.mjs`, CI) is unaffected because `.mjs` is always ESM.
+
+### Added
+- `docs/case-study-bounded-autonomy.md` — a three-run worked example on a real project: five cards auto-accepted
+  with no per-card sign-off, both stop conditions observed (budget exhausted, DoD met), audit findings held in the
+  backlog and later admitted by a new Mission, and a resumed run continuing from `RUN_STATE.md` alone.
+- `docs/evidence/runstate-cli/` — the runnable evidence behind that case study: the zero-dependency `runstate` CLI
+  (init / check / advance with a mechanical budget guard), its 9-case black-box test suite, the five accepted task
+  cards, both run summaries, and the final state file.
+
 ## [0.4.0] — 2026-09-12 — Bounded Autonomy
 
 Closes the gap that let an unbounded run happen: the loop governed *one card*, nothing governed *how many cards*.
