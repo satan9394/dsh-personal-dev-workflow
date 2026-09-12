@@ -227,6 +227,9 @@ try {
   }
 } finally {
   // 只删本脚本在系统临时目录下自建的根目录，绝不触碰项目根。
+  // 注意：这里用 fs.rmSync 是**彻底删除**（不进回收站），是本仓库唯一有意破例之处——Node 零依赖
+  // 没有"送进回收站"的内置 API。作用域由下一行双重校验锁死为「os.tmpdir() 下、以 runstate-tests-
+  // 开头」的目录，即本脚本运行开始时刚刚自己创建的目录。仓储所有者已于 2026-09-12 确认保持现状。
   if (tmpRoot.startsWith(tmpBase + path.sep) && path.basename(tmpRoot).startsWith('runstate-tests-')) {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
