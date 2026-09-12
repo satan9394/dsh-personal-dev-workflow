@@ -54,6 +54,7 @@ Five cards, five auto-accepts, zero per-card human sign-offs.
 - Two lessons were written into the test project's `AGENTS.md` as "don't do this" rules: never write prose inside a Budget section (a typo `abc / 2` silently disabled a guard), and never write acceptance criteria as on-the-spot snapshot values (they collided with the template defaults).
 - The test script cleans its own temp directories with `fs.rmSync` — technically a permanent delete, which sits against the repo owner's "deletions go to the recycle bin" rule. **Decision (2026-09-12): keep it.** Node has no zero-dependency recycle-bin API, and the scope is locked by a double guard to directories the script itself just created under `os.tmpdir()`; the script carries a comment saying exactly this.
 - At rest, a finished run's state file fails its own `check` (budgets are consumed) — correct in spirit, but worth a README note so it is not mistaken for corruption.
+- Red lines can be enforced by the harness, not just documented: in the owner's environment a pre-execute gate blocked a command merely *containing* the permanent-delete API name (it appeared in a commit message). The command was rewritten without the literal, and the guard never had to trust the agent's good intentions. This is the "advice vs constraint" rule from the skill working as designed.
 
 ## Why this matters
 
