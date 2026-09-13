@@ -1,12 +1,13 @@
 ---
-slug: personal-dev-workflow
 name: personal-dev-workflow
-displayName: Personal Dev Workflow
 description: "A lean personal development workflow: one conductor + isolated workers + file-based memory + a verification loop, inside bounded autonomy; a six-step task-card cycle with numeric budgets and explicit stop conditions. Use it for project development, task breakdown, feature work, and bug fixes."
+license: MIT
+compatibility: "Client-neutral Agent Skill (Claude Code, Codex, Cursor, DSH, OpenCode). Node.js 18+ runs the optional bounded-autonomy budget controller tools/runstate.js; the tools/pre-execute host gate (n3-budget-gate) is a DSH-only opt-in plugin."
 metadata:
   type: instruction
-  tags: [development, workflow, task-card, dsh, bounded-autonomy]
-version: "0.5.2"
+  version: "0.5.3"
+  displayName: Personal Dev Workflow
+  tags: "development, workflow, task-card, dsh, bounded-autonomy"
 ---
 
 # Personal Dev Workflow v4 (personal-dev-workflow)
@@ -108,7 +109,7 @@ Item 7 above is **discipline** (it depends on the agent obeying). Since v0.5.1 D
 - Task card `references/task-card-template.md` · SPEC `references/spec-template.md` · Verify checklist `references/verify-checklist.md`
 - Control layer: `references/production-control.md` (budgets, stop conditions, escalation) · `references/run-state-template.md`
 - Optional background: `references/framework.md`
-- 中文版见 `SKILL.zh-CN.md`（同名变体，正文中文，模板在 `references.zh-CN/`）。
+- 中文版是独立 skill 目录 `../personal-dev-workflow-zh/`（正文中文，模板在该目录自己的 `references/` 下）。
 
 ## Checklist (before closing each card)
 

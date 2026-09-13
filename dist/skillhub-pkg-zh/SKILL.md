@@ -1,12 +1,13 @@
 ---
-slug: personal-dev-workflow-zh
 name: personal-dev-workflow-zh
-displayName: 个人开发工作流（Personal Dev Workflow）
 description: 个人开发工作流：一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环，外挂有限自治；任务卡六步循环，带数字预算与明确停止条件。用于项目开发、拆任务卡、实现功能、修 bug。
+license: MIT
+compatibility: "面向标准 SKILL.md 的通用 skill（Claude Code / Codex / Cursor / DSH / OpenCode）。可选的有限自治预算控制器 tools/runstate.js 需 Node.js 18+；tools/pre-execute 宿主闸门（n3-budget-gate）是 DSH 专属的按需插件。"
 metadata:
   type: instruction
-  tags: [development, workflow, task-card, dsh, bounded-autonomy]
-version: "0.5.2"
+  version: "0.5.3"
+  displayName: 个人开发工作流（Personal Dev Workflow）
+  tags: "development, workflow, task-card, dsh, bounded-autonomy"
 ---
 
 # Personal Dev Workflow v4（personal-dev-workflow）

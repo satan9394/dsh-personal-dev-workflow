@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://img.shields.io/badge/install-npx%20skills%20add%20satan9394%2Fdsh--personal--dev--workflow-2ea44f)](https://skills.sh)
-[![version](https://img.shields.io/badge/version-0.5.2-informational)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.5.3-informational)](CHANGELOG.md)
 [![agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20DSH%20%7C%20OpenCode-8a2be2)](#install)
 
 > **One conductor + isolated workers + file-based memory + a verification loop + bounded autonomy.**
@@ -138,7 +138,7 @@ The CLI anchors to its own directory — copy it into your project root. `demos/
 
 This repo practices what the skill preaches:
 
-- `node scripts/validate-skills.mjs` (also run in CI) checks that each skill's frontmatter is valid, that `name` matches its folder, that every `references/...` file mentioned in the body exists, that each packaged copy (plugin bundle, `dist/` packages) matches the canonical `skills/` source byte-for-byte, and that every canonical `SKILL.md` **`version` equals the root `package.json` version** — release number, npm package, plugin bundle and skill metadata can never drift apart again.
+- `node scripts/validate-skills.mjs` (also run in CI) checks that each skill's frontmatter is valid, that `name` matches its folder, that every `references/...` file mentioned in the body exists, that each packaged copy (plugin bundle, `dist/` packages) matches the canonical `skills/` source byte-for-byte, and that every canonical `SKILL.md` **`metadata.version` equals the root `package.json` version** — release number, npm package, plugin bundle and skill metadata can never drift apart again.
 - `node tools/run-tests.mjs` (also run in CI) exercises the bounded-autonomy controller black-box: two-level budget parsing, `gate` allow/deny, atomic refusal (state hash unchanged), `new-run` semantics and `resume` wording — 34 cases. Conditionally skipped cases print `SKIP` and are **not** counted as passes; the suite also ships two failure-injection switches (`RS_TEST_FORCE_FAIL=1` / `=2`) that prove a broken expectation really does fail with a non-zero exit.
 - **Deletion-red-line exception, registered:** to clean up after itself the test suite (`tools/run-tests.mjs`) permanently deletes — with `fs.rmSync`, i.e. *not* to the recycle bin — exactly one directory it created itself under `os.tmpdir()`. This is an **approved exception** to the owner's "all deletions go to the recycle bin" rule (Node offers no zero-dependency recycle-bin API), confirmed by the repo owner on **2026-09-12**. The scope is locked by a double prefix check (`os.tmpdir()` + directory name starting with `runstate-v2-tests-`); if either check fails, cleanup is skipped instead. No repository, profile or user path can satisfy both prefixes.
 - `docs/evidence/runstate-cli/` keeps the historical artefacts of the three-run test (task cards, run summaries, final state file). Its old copies of the CLI and of the 9-case test script were **removed** (stale duplicates) — the live code is `tools/runstate.js` and `tools/run-tests.mjs`, which the evidence README and the case study now point to.
