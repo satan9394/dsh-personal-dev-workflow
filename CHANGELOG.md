@@ -3,11 +3,94 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [0.5.0] — 2026-09-12 — Mechanically enforced bounded autonomy
+## [0.5.1] — 2026-09-13 — Honesty and coverage: whole-file validation in the controller, and the host gate written down
+
+v0.5.1 has two themes, and neither is cosmetic. First, `advance` / `new-run` only validated *the single line they
+were about to touch*, which left four reproducible ways to step over a budget (or to launder an already-illegal
+state file) — all fixed, with the suite grown from 22 to 34 cases. Second, honesty and coverage: v0.5.0 described
+the controller's enforcement in absolute terms ("the limit cannot be talked around"), which overstates what a CLI
+can do, and the host-level gate that actually adds hard enforcement was not written down anywhere. Both are
+corrected here, without inflating the new facts either.
+
+### Added
+- **Host-level hard gate, documented for the first time (DSH only).** The profile plugin `n3-budget-gate`, registered
+  on the DSH `tools/pre-execute` waterfall, consults `node tools/runstate.js gate <project-root>` before dispatching.
+  Its enforcement surface is deliberately narrow, and all three limits below are part of the design:
+  - **Dispatch-class tools only** — `subagent` / `subagent_fork` / `workflow` / `ralph`. `pwsh` / shell / `read` /
+    `write` / `edit` and every other execution- or I/O-class tool are **not** gated, on purpose: an exhausted budget
+    must not lock the agent out of `runstate.js` itself, which would deadlock the session.
+  - **Unmanaged projects pass** — no `RUN_STATE.md` in the project root (exact-root, no upward walk) means there is
+    no budget to enforce, so the dispatch goes through with a one-time notice.
+  - **Fail-open when the gate is absent** — if the plugin is missing, unloaded, overridden or throwing internally,
+    the gate silently disappears and dispatch proceeds ungated. The **only fail-closed** case is a *managed project*
+    whose controller misbehaves (crash / non-JSON / timeout / script missing).
+  - `tools/runstate.js` itself remains **checkable but not enforceable**: it refuses an over-budget increment every
+    time it is invoked, and constrains nothing if it is never invoked. The host gate is the only hard layer, and it
+    covers the dispatch checkpoint only.
+- **The gate now ships in the repository**, not just in one profile: `plugin/dsh-budget-gate/index.mjs` is
+  byte-identical (SHA256 `E4AC33F9BA588C2D724EEF08540612818D894696F7964D64509A0090ACBBC790`) to the plugin actually
+  running on the author's machine, with `plugin/dsh-budget-gate/README.md` covering the install snippet (profile-side
+  `.mjs` + the `cordis.patch.yml` `insert` block), the six decision rules, the fail-open/closed boundary, backup and
+  rollback, and the audit path. Reproducibility was the gap: v0.5's only hard layer could not be rebuilt from the
+  repository at all.
+- `README.md` §**Enforcement boundary** and both `references/production-control.md` (EN/ZH) now carry the same three
+  statements (dispatch-class only · unmanaged projects pass · fail-open when the plugin is absent), so no document
+  claims an unbounded "mechanically enforced".
+- Local git tags **`v0.4.0` / `v0.4.1` / `v0.5.0`** now exist on the matching commits and agree with the remote refs
+  (the remote already carried `v0.5.0`), so `git log v0.5.0..v0.5.1` actually walks the release history.
+
+### Changed
+- The v0.5.0 entry below is kept for the record but its unconditional wording is qualified: enforcement is
+  mechanical **for every command that goes through the controller**, not for the agent as a whole.
+- `scripts/validate-skills.mjs` version consistency now also covers
+  `plugin/dsh-personal-dev-workflow/package.json` (must equal the root `package.json`), closing the last place a
+  release number could drift unnoticed.
+- `.github/workflows/publish-package.yml` runs `node tools/run-tests.mjs` **before** `npm publish`, so a controller
+  regression cannot be published (the push/PR workflow already had the step).
+
+### Fixed
+- **`advance` / `new-run` validated only the counter they were changing — seven reproducible findings, all closed.**
+  Both commands now run a **whole-file state validation before any write**, and refuse as one unit (exit 1, reason on
+  stderr, **file left byte-identical**) whenever any level holds a state error (illegal counter line, duplicate label
+  inside one section, missing required counter, value above `Number.MAX_SAFE_INTEGER`) or any limited counter is at
+  `current >= limit`. Concretely:
+  - **P0-2** — with `Epoch 2 / 2` already at the cap, `advance cards` exited 0 and rewrote the file anyway.
+  - **P0-3** — with an illegal line such as `完成卡数: abc / 6` present, `advance repairs` still exited 0 and wrote.
+  - **P1-4** — a duplicated counter label inside a budget section was silently accepted.
+  - **P1-9** — deleting a required counter line (`已用 Repair`) still let `check` / `gate` pass.
+  - **P1-8** — a value beyond `Number.MAX_SAFE_INTEGER` produced a silent no-op with exit 0 instead of an error.
+  - **P1-5** — `new-run` **laundered** a hand-edited over-cap value (`完成卡数 99 / 6`) into a legal state. The legal
+    exception is now distinguished precisely: Run-level `current == limit` (normal exhaustion) is **allowed** — that
+    is what `new-run` is for — while Run-level `current > limit` is a state error and is **refused**.
+  - **P1-6** — `new-run` with a Mission counter at its cap (`总卡数 12 / 12` or `Run 3 / 3`) is now **refused** and
+    escalates to a human instead of burning Run quota.
+  - `status --json`'s `allowNewRun` and `resume` were made to give the same answer as `new-run` for the Run-level
+    over-cap case, so the three surfaces can no longer disagree. Backward compatibility is preserved: a legacy file
+    with no `## Mission Budget` section still passes `check` (with a warning) and still works with `advance` — a
+    wholly absent section is exempt, only a present-but-incomplete one is an error.
+- **Stale evidence copies removed.** `docs/evidence/runstate-cli/runstate.js` and
+  `docs/evidence/runstate-cli/tests/run-tests.mjs` were frozen snapshots of the v0.4 CLI and its 9-case suite,
+  superseded by `tools/runstate.js` and the 34-case `tools/run-tests.mjs`. They were removed (to the recycle bin)
+  and replaced by pointers in `docs/evidence/runstate-cli/README.md` and `docs/case-study-bounded-autonomy.md`;
+  the run archive (task cards, run summaries, `RUN_STATE.md`, `AGENTS.md`, README) is kept.
+- **Conditional test skips are no longer silent passes.** A case skipped because its precondition does not hold
+  (e.g. "the project root has no `RUN_STATE.md`") now prints `SKIP` and is excluded from the pass count, instead of
+  being counted as a pass. The suite also asserts that passed + skipped + failed equals the total.
+- `tools/run-tests.mjs` gained a **second failure-injection point on a different case**
+  (`RS_TEST_FORCE_FAIL=2` → the `gate` deny case; `=1` keeps the original `check` case), so the failure path is
+  demonstrated on more than one assertion.
+- `README.md` §Verification now registers the test suite's temp-directory cleanup as an **approved exception** to
+  the "deletions go to the recycle bin" rule (scope locked by a double prefix check; owner-confirmed 2026-09-12),
+  and the stale "22 cases" counts were corrected to 34.
+
+## [0.5.0] — 2026-09-12 — Bounded autonomy, mechanically enforced by the controller
 
 v0.4 bounded autonomy was a *methodology*: the budgets and stop conditions were written in prose, and an agent that
-ignored them was only disobeying a document. v0.5 makes them mechanically enforced — the controller refuses an
-over-budget increment and leaves the state file byte-identical, so the limit cannot be talked around.
+ignored them was only disobeying a document. v0.5 moves the check **into the controller** — every increment routed
+through `tools/runstate.js` is validated first, an over-budget one is refused, and the state file is left
+byte-identical. That is a real constraint on the commands the controller runs, and **only** on those: it is not a
+claim that no controller-free path exists. See `references/production-control.md` §10 and the README's
+"Enforcement boundary" for what the host gate does and does not cover.
 
 ### Added
 - `tools/runstate.js` — the zero-dependency controller for `RUN_STATE.md`, promoted from the archived evidence CLI
@@ -17,12 +100,14 @@ over-budget increment and leaves the state file byte-identical, so the limit can
   `resume` (resume plan: Resume From + next step + whether a new Run is still allowed) · `gate` (the machine gate:
   `{"allow":true,…}` with exit 0, or `{"allow":false,"reason":…}` with exit 1) · `new-run` (Run-level reset with
   mission-level carry-over).
-- **Two-level budgets, both enforced mechanically.** Run Budget (`Epoch` · `完成卡数` · `已用 Repair` ·
+- **Two-level budgets, both enforced mechanically by the controller.** Run Budget (`Epoch` · `完成卡数` · `已用 Repair` ·
   `已派子代理`) protects the context; Mission Budget (`Run` · `总卡数` · `总 Repair`) is the total fuse. A Run-level
   exhaustion is automatic — `new-run` resets the four Run counters, increments Mission `Run`, and keeps the Mission
   totals as memory, so the agent continues in a fresh context without asking a human. Only a Mission-level
   exhaustion escalates to a human. Any increment that would cross either limit is refused with exit 1 and **the
-  state file is left byte-identical** (atomic refusal, asserted by hash in the test suite).
+  state file is left byte-identical** (atomic refusal, asserted by hash in the test suite) — for commands that go
+  through the controller; the CLI has no power over an agent that never calls it (see the 0.5.1 section and
+  the README's "Enforcement boundary").
 - `tools/run-tests.mjs` — black-box suite for the controller (22 cases: budget parsing, gate allow/deny, atomic
   refusal by SHA-256, `new-run` semantics, `resume` wording, plus a failure-injection path).
 - `package.json` script `test:runstate`, and a CI step running `node tools/run-tests.mjs` alongside the skill

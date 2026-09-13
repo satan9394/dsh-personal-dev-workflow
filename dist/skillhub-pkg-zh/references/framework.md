@@ -49,7 +49,7 @@ Harness 管 agent 单次运行的武装：给哪些工具、允许哪些动作�
 | 交证含工作证明 | OpenAI Symphony review packet（CI/PR review/演示视频） |
 | 人只做决策与验收 | OpenAI："Humans steer, agents execute."；Symphony："人管理工作而非监督 agent" |
 
-## 为什么要"有限自治"（v0.5.0）
+## 为什么要"有限自治"（v0.5.1）
 
 六步循环解决的是"**一张卡**可靠不可靠"，它对"卡最多能有多少"毫无约束——而无界运行恰恰出在这里：一个开放式 Prompt（"持续改进产品"）叠在自动续跑的 goal 上，审计发现又不断变回新卡进入执行，于是永远跑不完。
 
