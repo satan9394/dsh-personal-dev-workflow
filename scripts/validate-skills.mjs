@@ -12,6 +12,11 @@
  *      version (one release number for the whole repository: the skill, the
  *      plugin bundle, the dist packages and the npm package never drift).
  *
+ * A2. Release-number consistency: every canonical `SKILL.md` frontmatter
+ *     `version` **and** `plugin/dsh-personal-dev-workflow/package.json`
+ *     `version` must equal the root `package.json` version. A mismatch is a
+ *     FAIL and exits non-zero, naming the manifest that drifted.
+ *
  * B. Every packaged copy (plugin bundle, dist publish packages) must match the
  *    canonical skill byte-for-byte: no missing files, no modified files, no
  *    extra files. Run `node scripts/sync-copies.mjs` to regenerate copies.
@@ -25,29 +30,37 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsDir = join(repoRoot, 'skills');
 const rootPackageFile = join(repoRoot, 'package.json');
+/** The DSH bundle plugin's manifest — a second place the release number is written. */
+const pluginPackageFile = join(repoRoot, 'plugin', 'dsh-personal-dev-workflow', 'package.json');
+const pluginPackageScope = 'plugin/dsh-personal-dev-workflow/package.json';
 
 const failures = [];
 const checked = [];
 const skillVersions = new Map();
 
-/** Version declared by the repository root package.json (the release number). */
-function readRootVersion() {
-  if (!existsSync(rootPackageFile)) {
-    fail('package.json', 'repository root package.json is missing');
+/** Read a package.json `version`; any problem is recorded against `scope` and returns null. */
+function readPackageVersion(file, scope, label) {
+  if (!existsSync(file)) {
+    fail(scope, `${label} is missing`);
     return null;
   }
   let parsed;
   try {
-    parsed = JSON.parse(readFileSync(rootPackageFile, 'utf8'));
+    parsed = JSON.parse(readFileSync(file, 'utf8'));
   } catch (error) {
-    fail('package.json', `repository root package.json is not valid JSON: ${error.message}`);
+    fail(scope, `${label} is not valid JSON: ${error.message}`);
     return null;
   }
   if (typeof parsed.version !== 'string' || parsed.version.trim() === '') {
-    fail('package.json', 'repository root package.json has no non-empty "version"');
+    fail(scope, `${label} has no non-empty "version"`);
     return null;
   }
   return parsed.version.trim();
+}
+
+/** Version declared by the repository root package.json (the release number). */
+function readRootVersion() {
+  return readPackageVersion(rootPackageFile, 'package.json', 'repository root package.json');
 }
 
 function fail(scope, message) {
@@ -181,6 +194,21 @@ if (rootVersion !== null) {
   }
 }
 
+// --- A3. version consistency (plugin package.json == root package.json) ---
+// The DSH bundle plugin carries its own manifest; without this check it could
+// keep advertising an old release number while every skill file is correct.
+const pluginVersion = readPackageVersion(
+  pluginPackageFile,
+  pluginPackageScope,
+  'plugin package.json',
+);
+if (rootVersion !== null && pluginVersion !== null && pluginVersion !== rootVersion) {
+  fail(
+    pluginPackageScope,
+    `"version" (${pluginVersion}) must equal the root package.json version (${rootVersion})`,
+  );
+}
+
 // --- B. packaged copies ---
 const copyTargets = [
   {
@@ -222,4 +250,7 @@ if (failures.length > 0) {
 console.log(`\nAll ${checked.length} canonical skill(s) and ${copyTargets.length} packaged copy set(s) valid.`);
 if (rootVersion !== null) {
   console.log(`Version consistency: every canonical SKILL.md declares ${rootVersion}, matching the root package.json.`);
+  if (pluginVersion !== null && pluginVersion === rootVersion) {
+    console.log(`Version consistency: ${pluginPackageScope} declares ${pluginVersion}, matching the root package.json.`);
+  }
 }

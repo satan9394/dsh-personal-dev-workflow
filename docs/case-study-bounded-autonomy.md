@@ -2,7 +2,7 @@
 
 This is the empirical evidence behind the skill's **bounded autonomy** section (`SKILL.md` §Bounded autonomy, `references/production-control.md`). It is not a description of what *should* happen — it is what *did* happen when the workflow ran a real (small) project with deliberately tiny budgets.
 
-Runnable evidence lives in [`docs/evidence/runstate-cli/`](evidence/runstate-cli/): a zero-dependency CLI plus a 9-case black-box test suite.
+Runnable evidence lives in [`docs/evidence/runstate-cli/`](evidence/runstate-cli/): the five accepted task cards, both run summaries and the final `RUN_STATE.md` from the three runs. **The archived copies of the CLI and of the 9-case suite that used to sit in that directory were removed on 2026-09-13** (stale duplicates of the shipped code) — the live files are [`tools/runstate.js`](../tools/runstate.js) and the 34-case [`tools/run-tests.mjs`](../tools/run-tests.mjs), as the evidence README now states.
 
 ## What was built
 
@@ -12,7 +12,7 @@ A zero-dependency Node CLI, `runstate` — creates, validates and advances `RUN_
 node runstate.js init <dir>              # write a RUN_STATE.md skeleton (11 sections)
 node runstate.js check <dir>             # required sections + budget gate (non-zero when exhausted)
 node runstate.js advance <dir> <field>   # increment a counter; refuse past the limit without touching the file
-node tests/run-tests.mjs                 # 9 black-box cases; green exit 0, any failure non-zero
+node tests/run-tests.mjs                 # 9 black-box cases back then; the live suite is tools/run-tests.mjs (34 cases)
 ```
 
 Choosing this project was deliberate: it makes the controller testable on itself.

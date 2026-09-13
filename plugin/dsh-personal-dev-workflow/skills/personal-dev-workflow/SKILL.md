@@ -50,8 +50,39 @@ The six-step loop governs **how one card gets done**; this section governs **how
 4. **Blocker admission (disambiguated)**: a new issue that blocks the current Mission or card → source `blocker`, and it **may enter the workset automatically but never grows the workset cap**; if the workset is full, replace the lowest-priority not-yet-started card and move it to `Deferred Backlog` (noting its source). Does not block → `Deferred Backlog` directly.
 5. **Auto-accept, escalate by exception**: objective gates pass + low risk → auto-accept and continue. Escalate to the human only for product-semantics changes · irreversible or high-risk operations (deploy / delete / publish / credentials / money) · a blocked Mission · **Mission** budget exhausted with work unfinished.
 6. **Budget exhausted ≠ failure**: write `RUN_STATE.md` (mission, DoD, workset, blocked, deferred backlog, counters, last verified commit, resume point) and stop. The next run resumes from that file — never by re-reading a long history.
-7. **Dispatch through the gate (controller)**: before dispatching any card run `node tools/runstate.js gate <project-root>` — only `{"allow":true}` with exit 0 authorizes the dispatch; exit 1 → stop and checkpoint. `resume` prints the recovery plan, `new-run` opens a fresh Run, `status --json` is machine-readable.
+7. **Dispatch through the gate (controller)**: before dispatching any card run `node tools/runstate.js gate <project-root>` — only `{"allow":true}` with exit 0 authorizes the dispatch; exit 1 → stop and checkpoint. `resume` prints the recovery plan, `new-run` opens a fresh Run, `status --json` is machine-readable. **Since v0.5.1 this discipline also has a host-level hard backstop — see "Enforcement surface & fail-open/closed boundaries" below.**
 8. **One control policy per project**: this skill owns the development policy; `AGENTS.md` holds project-local rules; a goal is only an execution mechanism. Never stack a second open-ended "keep improving the product" prompt on top — that is how token runaway starts.
+
+## Enforcement surface & fail-open/closed boundaries
+
+Item 7 above is **discipline** (it depends on the agent obeying). Since v0.5.1 DSH has a **host-level hard gate** (`tools/pre-execute` plugin `n3-budget-gate`) that turns "check the budget before dispatching" into harness behavior. **Every number and boundary in this section is measured on a real machine, not design intent.**
+
+**Enforced surface (what it can block)**: only **dispatch-class** tools — `subagent` / `subagent_fork` / `workflow` / `ralph`. The block happens **before** the tool is dispatched (and before argument validation): the model receives `Error: 预算闸门: <reason>` and the tool body never runs.
+
+**Non-enforced surface (what it deliberately does NOT block)**: `pwsh` / `bash` / `read` / `write` / `edit` and every other execution- or I/O-class tool. This is the anti-deadlock design: once the budget is exhausted the agent can still run `node tools/runstate.js status|advance|new-run` to extend the budget, and can still edit or delete the state file. Otherwise "budget exhausted" would mean "permanently locked out".
+
+**Decision table (each row measured)**:
+
+| Situation | Behavior | Fail direction |
+|---|---|---|
+| Project root has **no** `RUN_STATE.md` (unmanaged project) | **allow** (+ a one-time notice) | **fail-open** — most directories have no state file; denying would lock down the whole harness |
+| Has `RUN_STATE.md`, gate prints valid JSON `{"allow":true}` | allow | — |
+| Has `RUN_STATE.md`, gate prints valid JSON `{"allow":false}` | **deny**, reason is the controller's verbatim text (with the exhausted counter and its current value) | — |
+| Has `RUN_STATE.md`, but the controller crashes / prints non-JSON / times out / is missing | **deny** | **fail-closed — for managed projects only**; the reason says "controller 异常，请修状态文件或删除它" |
+| Tool outside the whitelist (including `pwsh`) | allow, and the **controller is never even spawned** | fail-open |
+| An internal plugin error (bug / fs failure) | allow | **fail-open** — only a controller anomaly is fail-closed; one plugin exception must not brick the harness |
+
+**How the project root is resolved**: `exec.agent.session.header.cwd` (the session workspace), falling back to `process.cwd()`; config `projectRoot` can override it explicitly. The check is **exact-root** (no upward walk) — a subdirectory always counts as "unmanaged" and is allowed. Missing a block is preferable to locking something out.
+
+**Performance & caching**: one decision including spawning node costs about **79–117 ms** (measured; the target is < 200 ms). The same project root is cached for a **1.5 s TTL with in-flight coalescing** (a burst on one root spawns the controller once). **Do not lengthen the TTL** — budgets change.
+
+**Audit**: every decision appends one JSONL line to `~/.dsh/logs/n3-budget-gate.jsonl` (`ts` / `tool` / `root` / `exitCode` / `gateJson` / `decision` / `reason`), so you can later confirm whether a dispatch passed the gate and why.
+
+**Residual risk (stated honestly — do not treat this as the only line of defense)**:
+
+1. **The loading surface is fail-open**: if the plugin is missing, not loaded, or overridden by another layer of the same profile, the gate **silently disappears** — the same class of risk as `deny-risk-commands`. Confirm via doctor/health checks or a live test that the entry really is in the tree.
+2. **A broken patch file → dsh will not start** (fail-loud). Before touching a profile: back up `cordis.patch.yml`, really boot once in an isolated `DSH_HOME` (`--dump-config` is **not** enough to catch a duplicate loader entry id), send a harmless tool call right after the change, and roll back immediately on any anomaly.
+3. **It only covers the dispatch checkpoint**: it cannot constrain the work already running inside a dispatched worker, nor consumption that never goes through a tool call. The real cost gate is still "one envelope per Mission + two-level budgets".
 
 ## Rule-file discipline (AGENTS.md / CLAUDE.md)
 

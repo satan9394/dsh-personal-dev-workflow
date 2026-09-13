@@ -5,6 +5,12 @@
 零依赖（只用 `node:` 内置模块），单文件入口 `runstate.js`，需要 Node ≥18。
 项目本地约定见 `AGENTS.md`。
 
+> **归档说明（2026-09-13，v0.5.1）：** 本目录此前的 `runstate.js` 与 `tests/run-tests.mjs` 是 v0.4 时期的快照副本
+> （测试只有 9 个用例），早已落后于现役版本，**已删除**。CLI 与测试的唯一权威版本在仓库根：
+> [`tools/runstate.js`](../../../tools/runstate.js) 与 [`tools/run-tests.mjs`](../../../tools/run-tests.mjs)（现 34 个用例）。
+> 本目录只保留**历史运行归档**（任务卡、两份 run 摘要、`RUN_STATE.md`、`AGENTS.md`、本 README）。
+> 下文示例里的 `node runstate.js …` 请一律读作 `node tools/runstate.js …`。
+
 ## 用法
 
 ```
@@ -112,5 +118,5 @@ runstate: 错误: 预算已达上限: 完成卡数 6 / 6
   该项**仍在 Deferred Backlog**，本轮未修。
 - `advance` 没有 `--dry-run`；预演只能靠复制临时目录（仍在 backlog）。
 - 仅识别 `##` 二级标题节，且节名匹配不区分大小写、忽略标题括号后缀。
-- 自动化测试只有 `tests/run-tests.mjs` 这一条黑盒冒烟，覆盖 init / check / advance / 越界原子性 / 非法行 / `--help` / 未知子命令；
-  没有单元测试、没有覆盖率统计。
+- 自动化测试已迁到仓库根 `tools/run-tests.mjs`（34 个用例：init / check / advance / 越界原子性 / 非法行 /
+  gate / new-run / resume / 状态完整性加固等）；本目录不再自带测试副本，也仍没有单元测试与覆盖率统计。

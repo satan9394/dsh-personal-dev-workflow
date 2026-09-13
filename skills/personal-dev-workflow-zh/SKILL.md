@@ -50,8 +50,39 @@ version: "0.5.0"
 4. **blocker 准入（消歧）**：新问题若阻塞当前 Mission / 当前卡 → 来源标 `blocker`，**可自动进入 WorkSet，但不得扩大 WorkSet 上限**；WorkSet 已满时替换一张尚未执行的最低优先级卡，被替换者移入 `Deferred Backlog`（并注明来源）。不阻塞 → 直接进 `Deferred Backlog`。
 5. **自动验收，例外才升级**：客观门禁通过且低风险 → 自动合入并继续。只有这四类升级给人：产品语义变更 · 不可逆/高风险操作（部署/删除/发布/凭据/资金）· Mission 被阻塞 · **Mission** 预算耗尽但活没干完。
 6. **预算耗尽 ≠ 失败**：写 `RUN_STATE.md`（Mission、DoD、WorkSet、Blocked、Deferred Backlog、计数器、最后验证过的 commit、Resume From）后停止；下一轮从该文件续跑，绝不靠重读超长历史。
-7. **派活前过机器闸门（控制器）**：派任何卡之前先跑 `node tools/runstate.js gate <项目根>`——只有 `{"allow":true}` 且 exit 0 才可派；exit 1 必须停止并 checkpoint。`resume` 打印恢复计划，`new-run` 开新 Run，`status --json` 供机器读取。
+7. **派活前过机器闸门（控制器）**：派任何卡之前先跑 `node tools/runstate.js gate <项目根>`——只有 `{"allow":true}` 且 exit 0 才可派；exit 1 必须停止并 checkpoint。`resume` 打印恢复计划，`new-run` 开新 Run，`status --json` 供机器读取。**v0.5.1 起这条纪律另有 host 级硬拦截兜底，见下节「强制面与 fail-open/closed 边界」。**
 8. **一个项目只允许一套控制策略**：本 skill 负责开发策略；`AGENTS.md` 只放项目本地规则；goal 只是执行机制。**不要再叠一个开放式"持续改进产品"的 Prompt**——那正是 Token 失控的起点。
+
+## 强制面与 fail-open/closed 边界
+
+上面第 7 条是**纪律**（靠 agent 自觉）；v0.5.1 起 DSH 里另有一层 **host 级硬拦截**（`tools/pre-execute` 门禁插件 `n3-budget-gate`），把"派活前查预算"变成 harness 行为。**这一节的数字与边界全部是本机实测值，不是设计意图。**
+
+**强制面（能拦什么）**：只拦**派活类**工具 —— `subagent` / `subagent_fork` / `workflow` / `ralph`。拦截发生在工具派发**之前**（参数校验之前），模型收到 `Error: 预算闸门: <reason>`，工具体根本没跑。
+
+**非强制面（不拦什么，故意如此）**：`pwsh` / `bash` / `read` / `write` / `edit` 等执行类与读写类**一律不拦**。这是防死锁的关键设计：预算触顶后 agent 仍能跑 `node tools/runstate.js status|advance|new-run` 自救续预算，也能改/删状态文件；否则触顶 = 永久锁死。
+
+**判定表（逐条实测）**：
+
+| 情形 | 行为 | fail 方向 |
+|---|---|---|
+| 项目根**没有** `RUN_STATE.md`（未管理项目） | **放行**（+ 一次性提示） | **fail-open** —— 绝大多数目录没有状态文件，若拒绝等于锁死整个 harness |
+| 有 `RUN_STATE.md`，gate 输出合法 JSON `{"allow":true}` | 放行 | — |
+| 有 `RUN_STATE.md`，gate 输出合法 JSON `{"allow":false}` | **拒绝**，reason 用 controller 原文（含触顶计数器与当前值） | — |
+| 有 `RUN_STATE.md`，但 controller 崩溃 / 非 JSON / 超时 / 脚本缺失 | **拒绝** | **fail-closed —— 但只对已管理项目**；理由写明"controller 异常，请修状态文件或删除它" |
+| 白名单外工具（含 `pwsh`） | 放行，**连 controller 都不跑** | fail-open |
+| 插件自身内部错误（bug / fs 异常） | 放行 | **fail-open** —— controller 异常才 fail-closed，插件的一个异常不该锁死 harness |
+
+**项目根怎么定**：`exec.agent.session.header.cwd`（会话工作区），退化到 `process.cwd()`；可用配置 `projectRoot` 显式覆盖。判定是**精确根**（不向上遍历）——子目录一律按"未管理"放行，宁可漏拦也不误锁。
+
+**性能与缓存**：单次判定含 spawn node 约 **79–117ms**（本机实测，目标 < 200ms）；同一项目根 **1.5s TTL 缓存 + 并发合并**（同根风暴只跑一次 controller）。**不要把 TTL 调长**——预算是会变的。
+
+**审计**：每次判定追加一行 JSONL 到 `~/.dsh/logs/n3-budget-gate.jsonl`（`ts` / `tool` / `root` / `exitCode` / `gateJson` / `decision` / `reason`），可事后核对"这次派活到底过没过闸门、理由是什么"。
+
+**残余风险（如实声明，别把它当唯一防线）**：
+
+1. **加载面是 fail-open**：插件缺失、未加载、或被同 profile 其它层覆盖时**静默失效**，没有任何拦截 —— 与 `deny-risk-commands` 同一类风险。须靠 doctor/体检或实测确认条目真的在树里。
+2. **patch 文件本身坏 → dsh 起不来**（fail-loud）。改 profile 前必须先备份 `cordis.patch.yml`、先在隔离 `DSH_HOME` 真 boot 一次（`--dump-config` **不足以**发现 duplicate loader entry id），改后立刻发一次无害工具调用冒烟，异常即刻回滚。
+3. **只覆盖"派活"这个关口**：它管不住已经被派出去、正在跑的 worker 内部的工作量；也管不住不经过工具调用的消耗。真正的成本闸门仍是"一个 Mission 一个信封 + 两级预算"。
 
 ## 规则文件纪律（AGENTS.md / CLAUDE.md）
 
