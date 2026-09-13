@@ -3,19 +3,26 @@
  * runstate v2 自动化测试（卡 C1 + 补卡 C1b，零依赖；由 docs/evidence/runstate-cli/tests/run-tests.mjs 升格）
  *
  * 覆盖：两级预算（Run / Mission）、advance 组合语义与原子拒绝、check/status/resume/gate、
- *       new-run（Run 边界机械续跑：Run 级四项归零 + Mission Run +1，Mission Run 触顶则拒绝）。
+ *       new-run（Run 边界机械续跑：Run 级四项归零 + Mission Run +1，Mission Run 触顶则拒绝）、
+ *       F1 状态完整性加固（整文件写前校验：触顶后一律拒写 / 非法文件拒写 / 重复标签 / 必需项缺失 /
+ *       数值越界；new-run 的 == 允许 vs > 拒绝 vs Mission >= 拒绝；向后兼容边界）。
  *
  * 设计要点：
  *   - 只用 node: 内置模块；通过 child_process 调本仓 tools/runstate.js（只看黑盒行为，不依赖内部实现）。
  *   - 全部用例在系统临时目录（os.tmpdir() 下新建目录）内运行，结束自行清理；
  *     绝不读写项目根 / docs 下的任何文件（用例 ⑬ 与附加守卫专门比对它们前后哈希）。
- *   - 逐条打印 PASS/FAIL，结束打印用例总数与失败数；全绿 exit 0，任一失败 exit 1。
- *   - 失败路径自检：设置 RS_TEST_FORCE_FAIL=1 会把一处期望值写反，
+ *   - 逐条打印 PASS/FAIL/SKIP，结束打印用例总数、通过数、跳过数与失败数；全绿 exit 0，任一失败 exit 1。
+ *   - 条件跳过：前置条件不成立（如"项目根若存在 RUN_STATE.md"）的用例打印 SKIP，
+ *     **不计入通过数**（现状修正：以前是静默算 PASS）。通过 + 跳过 + 失败必须等于用例总数。
+ *   - 失败路径自检（两个独立注入点，落在不同用例上）：
+ *       RS_TEST_FORCE_FAIL=1  注入用例 ②（合法骨架 check 的退出码）
+ *       RS_TEST_FORCE_FAIL=2  注入用例 ⑨（gate 拒绝时的 JSON.allow）
  *     用来证明"失败会被如实上报、退出码非 0"。
  *
  * 用法：
- *   node tools/run-tests.mjs                        正常跑，期望全绿 exit 0
- *   RS_TEST_FORCE_FAIL=1 node tools/run-tests.mjs   失败注入，期望 FAIL 且 exit 1
+ *   node tools/run-tests.mjs                        正常跑，期望全绿 exit 0（跳过项打印 SKIP）
+ *   RS_TEST_FORCE_FAIL=1 node tools/run-tests.mjs   失败注入点 1（用例 ②），期望 FAIL 且 exit 1
+ *   RS_TEST_FORCE_FAIL=2 node tools/run-tests.mjs   失败注入点 2（用例 ⑨），期望 FAIL 且 exit 1
  */
 'use strict';
 
@@ -30,8 +37,13 @@ const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const CLI = path.join(PROJECT_ROOT, 'tools', 'runstate.js');
 const STATE_FILE = 'RUN_STATE.md';
 
-/** 失败注入开关：为 true 时把「合法骨架 check」的期望退出码写成 1 与真实行为不符。 */
+/**
+ * 失败注入开关（两个独立注入点，落在不同用例上）：
+ *   '1' → 用例 ②：把「合法骨架 check」的期望退出码写成 1（与真实行为 0 不符）；
+ *   '2' → 用例 ⑨：把「gate 拒绝时」的期望 JSON.allow 写成 true（与真实行为 false 不符）。
+ */
 const FORCE_FAIL = process.env.RS_TEST_FORCE_FAIL === '1';
+const FORCE_FAIL_GATE = process.env.RS_TEST_FORCE_FAIL === '2';
 
 /** 项目根状态文件（存在时只读一次哈希做基线，全程不该被本脚本改动）。 */
 const ROOT_STATE = path.join(PROJECT_ROOT, STATE_FILE);
@@ -121,11 +133,42 @@ function stripMissionBudget(dir) {
   writeState(dir, out.join('\n'));
 }
 
+/** 把某计数行整行替换为给定文本（测试专用，模拟手工改坏 / 超限）。 */
+function replaceLine(dir, from, to) {
+  const text = readState(dir);
+  if (!text.includes(from)) throw new Error(`状态文件里找不到要替换的行 "${from}"`);
+  writeState(dir, text.replace(from, to));
+}
+
+/** 在某计数行之后复制一份同样的行（模拟同一节内重复标签，P1-4）。 */
+function duplicateLine(dir, line) {
+  const text = readState(dir);
+  if (!text.includes(line)) throw new Error(`状态文件里找不到要复制的行 "${line}"`);
+  writeState(dir, text.replace(line, `${line}\n${line}`));
+}
+
+/** 删除某计数行（连同行尾换行；模拟必需计数行缺失，P1-9）。 */
+function deleteLine(dir, line) {
+  const text = readState(dir);
+  if (!text.includes(line)) throw new Error(`状态文件里找不到要删除的行 "${line}"`);
+  writeState(dir, text.replace(`${line}\n`, ''));
+}
+
 /* ───────────────────────────────── 用例 ───────────────────────────────── */
 
 const cases = [];
 function test(name, fn) {
   cases.push({ name, fn });
+}
+
+/**
+ * 用例主动跳过（前置条件不成立）：运行器打印 SKIP 并把它排除在**通过数**之外。
+ * 与"静默 return 算 PASS"的区别就在这里：跳过必须可见，且不能冒充通过。
+ */
+class SkipCase extends Error {}
+
+function skipCase(reason) {
+  throw new SkipCase(reason);
 }
 
 // ① init 生成 12 个 "## " 节（原 11 节 + Mission Budget）
@@ -167,6 +210,8 @@ test('② 合法骨架 check → exit 0', () => {
 });
 
 // ③ advance cards 同时递增 Run 级「完成卡数」与 Mission 级「总卡数」
+//    顺序说明（F1 新语义，非回归）：任一级任一有限额计数器 current >= limit 之后，**任何** advance 都被整体拒绝，
+//    因此「已用 Repair: 1 / 1」这一步必须放在最后，否则后续 advance 会被预算守卫拦下。
 test('③ advance cards 递增 Run+Mission 两处', () => {
   const dir = initDir('advance-cards');
   const r = runCli(['advance', dir, 'cards']);
@@ -177,14 +222,15 @@ test('③ advance cards 递增 Run+Mission 两处', () => {
   assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'Epoch 不该被 cards 改动');
   assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 0 / 1', 'Run 级 Repair 不该被 cards 改动');
   assertEq(counterLine(dir, '总 Repair'), '- 总 Repair: 0 / 3', 'Mission 级 Repair 不该被 cards 改动');
-  // repairs / runs 的组合语义
-  assertEq(runCli(['advance', dir, 'repairs']).status, 0, 'advance repairs 退出码');
-  assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 1 / 1', 'Run 级已用 Repair 行');
-  assertEq(counterLine(dir, '总 Repair'), '- 总 Repair: 1 / 3', 'Mission 级总 Repair 行');
+  // runs 的组合语义（Mission 级单独 +1）
   const runs = runCli(['advance', dir, 'runs']);
   assertEq(runs.status, 0, 'advance runs 退出码');
   assertEq(counterLine(dir, 'Run'), '- Run: 1 / 3', 'Mission 级 Run 行');
   assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'runs 不该动 Run 级 Epoch');
+  // repairs 的组合语义放最后（它会把 Run 级「已用 Repair」推到 1 / 1 触顶）
+  assertEq(runCli(['advance', dir, 'repairs']).status, 0, 'advance repairs 退出码');
+  assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 1 / 1', 'Run 级已用 Repair 行');
+  assertEq(counterLine(dir, '总 Repair'), '- 总 Repair: 1 / 3', 'Mission 级总 Repair 行');
 });
 
 // ④ Run 级越界拒绝且文件 SHA256 不变（原子性）
@@ -287,7 +333,12 @@ test('⑨ gate 某级触顶时 exit 1 且 allow=false、reason 非空', () => {
   const r = runCli(['gate', dir]);
   assertEq(r.status, 1, 'gate 拒绝时退出码');
   const parsed = JSON.parse(r.stdout);
-  assertEq(parsed.allow, false, 'JSON.allow');
+  // FORCE_FAIL_GATE 注入点（用例 ⑨）：故意与真实行为（false）不符，用于实测第二处失败路径。
+  assertEq(
+    parsed.allow,
+    FORCE_FAIL_GATE ? true : false,
+    'JSON.allow' + (FORCE_FAIL_GATE ? '（RS_TEST_FORCE_FAIL=2 注入的期望值）' : ''),
+  );
   assert(typeof parsed.reason === 'string' && parsed.reason.trim().length > 0, 'reason 应非空');
   assert(/Mission/.test(parsed.reason), `reason 应点名 Mission 级：${parsed.reason}`);
   assertEq(parsed.mission.exhausted, true, 'JSON.mission.exhausted');
@@ -341,9 +392,8 @@ test('⑫ 未知子命令 exit 2', () => {
 // ⑬ 项目根 RUN_STATE.md（若存在）不被测试改动
 test('⑬ 项目根 RUN_STATE.md 未被本脚本触碰（基线哈希自检）', () => {
   if (rootHashBefore === null) {
-    // 任务卡写的是"若存在"：本仓根目录当前没有 RUN_STATE.md，条件用例按跳过处理（不算失败）。
-    process.stdout.write('      ↳ 项目根无 RUN_STATE.md：条件用例跳过（条件：若存在）\n');
-    return;
+    // 任务卡写的是"若存在"：本仓根目录当前没有 RUN_STATE.md，条件用例按跳过处理（打印 SKIP，不计入通过数）。
+    skipCase('项目根无 RUN_STATE.md（条件：若存在）—— 本用例本次跳过，未计入通过数');
   }
   assert(fs.existsSync(ROOT_STATE), '项目根 RUN_STATE.md 消失了');
   assertEq(sha256(ROOT_STATE), rootHashBefore, '项目根 RUN_STATE.md SHA256');
@@ -414,8 +464,9 @@ test('⑱ new-run 后 Run 级四项归零且 Mission Run +1', () => {
   const dir = initDir('new-run');
   assertEq(runCli(['advance', dir, 'epoch']).status, 0, 'advance epoch');
   assertEq(runCli(['advance', dir, 'cards']).status, 0, 'advance cards');
-  assertEq(runCli(['advance', dir, 'repairs']).status, 0, 'advance repairs');
   assertEq(runCli(['advance', dir, 'subagents']).status, 0, 'advance subagents');
+  // repairs 放最后：它把 Run 级「已用 Repair」推到 1 / 1 触顶，之后任何 advance 都会被整体拒绝（新语义）
+  assertEq(runCli(['advance', dir, 'repairs']).status, 0, 'advance repairs');
   // 前置：Run 级四项都被推到非零，Mission 级总量也各自 +1
   assertEq(counterLine(dir, 'Epoch'), '- Epoch: 1 / 2', '推进后 Epoch');
   assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 1 / 6', '推进后 完成卡数');
@@ -453,11 +504,11 @@ test('⑱ new-run 后 Run 级四项归零且 Mission Run +1', () => {
 test('⑲ Mission Run 触顶时 new-run 拒绝、exit 1、SHA256 不变', () => {
   const dir = initDir('new-run-denied');
   setLimit(dir, 'Run', 1); // Mission Run 上限压到 1
-  assertEq(runCli(['advance', dir, 'runs']).status, 0, '推到 Mission Run 上限');
-  assertEq(counterLine(dir, 'Run'), '- Run: 1 / 1', 'Mission Run 已在上限');
-  // 顺便把 Run 级推一格，用来证明拒绝时不会被部分重置
+  // 顺序说明（F1 新语义）：先把 Run 级推一格，再推 Mission Run 触顶——触顶后任何 advance 都会被拒。
   assertEq(runCli(['advance', dir, 'cards']).status, 0, 'advance cards');
   assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 1 / 6', 'new-run 前的 Run 级完成卡数');
+  assertEq(runCli(['advance', dir, 'runs']).status, 0, '推到 Mission Run 上限');
+  assertEq(counterLine(dir, 'Run'), '- Run: 1 / 1', 'Mission Run 已在上限');
 
   const before = sha256(statePath(dir));
   const r = runCli(['new-run', dir]);
@@ -516,15 +567,252 @@ test('㉑ resume 仅在 Run 耗尽时含"无需人工确认"且 exit 0', () => {
   assert(!/无需人工确认/.test(rd.stdout), `Mission 耗尽时不该说"无需人工确认"：${rd.stdout.trim()}`);
 });
 
+/* ───────────── F1 状态完整性加固（P0-2 / P0-3 / P1-4 / P1-5 / P1-6 / P1-8 / P1-9） ───────────── */
+
+// ㉒ P0-2：Epoch 2 / 2 触顶后 gate 已 DENY，advance cards 仍必须整体拒绝且文件字节不变
+test('㉒ P0-2 Epoch 触顶后 advance 一律拒绝且 SHA256 不变', () => {
+  const dir = initDir('p0-2-epoch-exhausted');
+  assertEq(runCli(['advance', dir, 'epoch']).status, 0, '第 1 次 advance epoch');
+  assertEq(runCli(['advance', dir, 'epoch']).status, 0, '第 2 次 advance epoch（恰好到上限）');
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 2 / 2', 'Epoch 已触顶');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', 'Run 级完成卡数仍有余量');
+
+  const denied = runCli(['gate', dir]);
+  assertEq(denied.status, 1, 'gate 在 Epoch 触顶时应 DENY');
+  assertEq(JSON.parse(denied.stdout).allow, false, 'gate JSON.allow');
+  assertEq(JSON.parse(denied.stdout).run.exhausted, true, 'gate JSON.run.exhausted');
+
+  const before = sha256(statePath(dir));
+  const r = runCli(['advance', dir, 'cards']);
+  assertEq(r.status, 1, 'P0-2：Epoch 触顶后 advance cards 退出码');
+  assert(/预算守卫/.test(r.stderr), `stderr 未提到预算守卫：${r.stderr.trim()}`);
+  assert(/Epoch/.test(r.stderr), `stderr 未点名 Epoch：${r.stderr.trim()}`);
+  assert(/文件未做任何修改/.test(r.stderr), `stderr 未声明文件未修改：${r.stderr.trim()}`);
+  assertEq(sha256(statePath(dir)), before, 'P0-2 拒绝后文件 SHA256（字节不变）');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', '拒绝时 Run 级完成卡数不得被改');
+  assertEq(counterLine(dir, '总卡数'), '- 总卡数: 0 / 12', '拒绝时 Mission 级总卡数不得被改');
+});
+
+// ㉓ P0-3：文件已非法（完成卡数 abc / 6）时 advance / new-run 都不得写盘
+test('㉓ P0-3 文件已非法时 advance 拒绝写盘且 SHA256 不变', () => {
+  const dir = initDir('p0-3-malformed');
+  replaceLine(dir, '- 完成卡数: 0 / 6', '- 完成卡数: abc / 6');
+  assertEq(runCli(['check', dir]).status, 1, '非法文件 check 退出码');
+  assertEq(runCli(['gate', dir]).status, 1, '非法文件 gate 退出码');
+
+  const before = sha256(statePath(dir));
+  const r = runCli(['advance', dir, 'repairs']);
+  assertEq(r.status, 1, 'P0-3：非法文件下 advance repairs 退出码');
+  assert(/格式非法/.test(r.stderr), `stderr 未指出格式非法：${r.stderr.trim()}`);
+  assert(/文件未做任何修改/.test(r.stderr), `stderr 未声明文件未修改：${r.stderr.trim()}`);
+  assertEq(sha256(statePath(dir)), before, 'P0-3 拒绝后文件 SHA256（字节不变）');
+  assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 0 / 1', 'Run 级已用 Repair 不得被改');
+  assertEq(counterLine(dir, '总 Repair'), '- 总 Repair: 0 / 3', 'Mission 级总 Repair 不得被改');
+
+  assertEq(runCli(['new-run', dir]).status, 1, 'P0-3：非法文件下 new-run 退出码');
+  assertEq(sha256(statePath(dir)), before, 'P0-3 new-run 拒绝后 SHA256 不变');
+});
+
+// ㉔ 任一有限额计数器触顶 → 所有 advance 一律整体拒绝（不再只校验被推进的那一行）
+test('㉔ 任一计数器触顶后 advance 一律整体拒绝（不看推进的是哪一行）', () => {
+  const dir = initDir('any-exhausted-blocks-all');
+  assertEq(runCli(['advance', dir, 'repairs']).status, 0, 'advance repairs');
+  assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 1 / 1', '已用 Repair 触顶');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', '完成卡数仍有余量');
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'Epoch 仍有余量');
+
+  const before = sha256(statePath(dir));
+  for (const field of ['cards', 'epoch', 'subagents', 'totalcards', 'totalrepairs', 'runs']) {
+    const r = runCli(['advance', dir, field]);
+    assertEq(r.status, 1, `触顶后 advance ${field} 退出码`);
+    assert(/文件未做任何修改/.test(r.stderr), `advance ${field} 未声明文件未修改：${r.stderr.trim()}`);
+    assertEq(sha256(statePath(dir)), before, `触顶后 advance ${field} 拒绝时 SHA256 不变`);
+  }
+});
+
+// ㉕ P1-4：同一节内重复标签 → check / gate 非零，advance / new-run 拒写
+test('㉕ P1-4 重复标签 → check/gate 非零且写命令拒写', () => {
+  const dir = initDir('duplicate-label');
+  duplicateLine(dir, '- 已用 Repair: 0 / 1');
+  assertEq((readState(dir).match(/- 已用 Repair: 0 \/ 1/g) || []).length, 2, '重复行插入失败');
+
+  const c = runCli(['check', dir]);
+  assertEq(c.status, 1, '重复标签 check 退出码');
+  assert(/重复/.test(c.stderr), `check stderr 未指出重复标签：${c.stderr.trim()}`);
+
+  const g = runCli(['gate', dir]);
+  assertEq(g.status, 1, '重复标签 gate 退出码');
+  assertEq(JSON.parse(g.stdout).allow, false, '重复标签 JSON.allow');
+  assert(/重复/.test(JSON.parse(g.stdout).reason), `gate reason 未指出重复标签：${JSON.parse(g.stdout).reason}`);
+
+  const before = sha256(statePath(dir));
+  const r = runCli(['advance', dir, 'cards']);
+  assertEq(r.status, 1, '重复标签下 advance 退出码');
+  assert(/重复/.test(r.stderr), `advance stderr 未指出重复标签：${r.stderr.trim()}`);
+  assertEq(sha256(statePath(dir)), before, '重复标签下 advance 拒绝时 SHA256 不变');
+
+  assertEq(runCli(['new-run', dir]).status, 1, '重复标签下 new-run 退出码');
+  assertEq(sha256(statePath(dir)), before, '重复标签下 new-run 拒绝时 SHA256 不变');
+});
+
+// ㉖ P1-5：完成卡数 99 / 6（current > limit）不能被 new-run 洗白
+test('㉖ P1-5 完成卡数 99 / 6 不能被 new-run 洗白', () => {
+  const dir = initDir('p1-5-whitewash');
+  replaceLine(dir, '- 完成卡数: 0 / 6', '- 完成卡数: 99 / 6');
+  const denied = runCli(['gate', dir]);
+  assertEq(denied.status, 1, 'gate 应先 DENY');
+  assertEq(JSON.parse(denied.stdout).allow, false, 'gate JSON.allow');
+
+  const before = sha256(statePath(dir));
+  const r = runCli(['new-run', dir]);
+  assertEq(r.status, 1, 'P1-5：超限状态下 new-run 退出码');
+  assert(/非法超限/.test(r.stderr), `stderr 未指出非法超限：${r.stderr.trim()}`);
+  assert(/文件未做任何修改/.test(r.stderr), `stderr 未声明文件未修改：${r.stderr.trim()}`);
+  assertEq(sha256(statePath(dir)), before, 'P1-5 拒绝后文件 SHA256（字节不变）');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 99 / 6', '超限值不得被重置');
+
+  const after = runCli(['gate', dir]);
+  assertEq(after.status, 1, '洗白尝试后 gate 仍应 DENY');
+  assertEq(JSON.parse(after.stdout).allow, false, '洗白尝试后 JSON.allow 仍为 false');
+});
+
+// ㉗ P1-6：Mission 级耗尽时反复 new-run 一律拒绝，且不烧 Run 配额
+test('㉗ P1-6 Mission 总卡数 12 / 12 耗尽时 new-run 一律拒绝且不烧 Run 配额', () => {
+  const dir = initDir('p1-6-mission-spent');
+  replaceLine(dir, '- 总卡数: 0 / 12', '- 总卡数: 12 / 12');
+  const before = sha256(statePath(dir));
+  for (let i = 1; i <= 3; i++) {
+    const r = runCli(['new-run', dir]);
+    assertEq(r.status, 1, `P1-6：第 ${i} 次 new-run 退出码`);
+    assert(/Mission/.test(r.stderr), `stderr 未点名 Mission：${r.stderr.trim()}`);
+    assert(/已达上限/.test(r.stderr), `stderr 未说明已达上限：${r.stderr.trim()}`);
+    assert(/升级给人/.test(r.stderr), `stderr 未提示升级给人：${r.stderr.trim()}`);
+    assertEq(sha256(statePath(dir)), before, `P1-6：第 ${i} 次拒绝后 SHA256 不变`);
+  }
+  assertEq(counterLine(dir, 'Run'), '- Run: 0 / 3', 'Run 配额不得被烧');
+  assertEq(counterLine(dir, '总卡数'), '- 总卡数: 12 / 12', 'Mission 记忆不得被改');
+  assertEq(runCli(['gate', dir]).status, 1, 'Mission 耗尽时 gate 仍 DENY');
+});
+
+// ㉘ P1-8：数值超 Number.MAX_SAFE_INTEGER → 状态错误，不再"静默 no-op 却 exit 0"
+test('㉘ P1-8 数值超 Number.MAX_SAFE_INTEGER → check 非零且 advance 拒写', () => {
+  const dir = initDir('p1-8-unsafe-int');
+  replaceLine(dir, '- Epoch: 0 / 2', '- Epoch: 9007199254740993 / 10000000000000000');
+  const c = runCli(['check', dir]);
+  assertEq(c.status, 1, 'P1-8：check 退出码');
+  assert(/安全整数/.test(c.stderr), `check stderr 未指出数值越界：${c.stderr.trim()}`);
+  assertEq(runCli(['gate', dir]).status, 1, 'P1-8：gate 退出码');
+
+  const before = sha256(statePath(dir));
+  const r = runCli(['advance', dir, 'epoch']);
+  assertEq(r.status, 1, 'P1-8：advance epoch 退出码（旧行为是静默 no-op + exit 0）');
+  assert(/安全整数/.test(r.stderr), `advance stderr 未指出数值越界：${r.stderr.trim()}`);
+  assertEq(sha256(statePath(dir)), before, 'P1-8 拒绝后文件 SHA256（字节不变）');
+  assertEq(runCli(['new-run', dir]).status, 1, 'P1-8：new-run 也应拒绝');
+  assertEq(sha256(statePath(dir)), before, 'P1-8 new-run 拒绝后 SHA256 不变');
+
+  // 边界不误杀：恰好等于 MAX_SAFE_INTEGER（9007199254740991）且无上限 → 仍合法
+  const edge = initDir('p1-8-boundary');
+  replaceLine(edge, '- 已派子代理: 0', '- 已派子代理: 9007199254740991');
+  const ec = runCli(['check', edge]);
+  assertEq(ec.status, 0, '边界值（== MAX_SAFE_INTEGER，无上限）check 应通过');
+  assert(!/安全整数/.test(ec.stderr), `边界值不该被判为数值越界：${ec.stderr.trim()}`);
+});
+
+// ㉙ P1-9：删除必需计数行「已用 Repair」→ check / gate 非零且写命令拒写
+test('㉙ P1-9 删除必需计数行「已用 Repair」→ check 非零且写命令拒写', () => {
+  const dir = initDir('p1-9-missing-run-item');
+  deleteLine(dir, '- 已用 Repair: 0 / 1');
+  assert(!readState(dir).includes('- 已用 Repair:'), '删除行未生效');
+
+  const c = runCli(['check', dir]);
+  assertEq(c.status, 1, 'P1-9：check 退出码');
+  assert(/缺少必需计数行/.test(c.stderr), `check stderr 未指出必需项缺失：${c.stderr.trim()}`);
+  assert(/已用 Repair/.test(c.stderr), `check stderr 未点名缺失项：${c.stderr.trim()}`);
+  assertEq(runCli(['gate', dir]).status, 1, 'P1-9：gate 退出码');
+
+  const before = sha256(statePath(dir));
+  assertEq(runCli(['advance', dir, 'cards']).status, 1, 'P1-9：缺必需项时 advance 退出码');
+  assertEq(sha256(statePath(dir)), before, 'P1-9 advance 拒绝后 SHA256 不变');
+  assertEq(runCli(['new-run', dir]).status, 1, 'P1-9：缺必需项时 new-run 退出码');
+  assertEq(sha256(statePath(dir)), before, 'P1-9 new-run 拒绝后 SHA256 不变');
+});
+
+// ㉚ Mission 节存在但计数行不全 → 判错（只有"整节缺失"才豁免，向后兼容边界）
+test('㉚ Mission 节存在但缺「总 Repair」→ 判错；整节缺失才豁免', () => {
+  const dir = initDir('mission-incomplete');
+  deleteLine(dir, '- 总 Repair: 0 / 3');
+  const c = runCli(['check', dir]);
+  assertEq(c.status, 1, '节存在而计数行不全 → check 必须非零');
+  assert(/缺少必需计数行/.test(c.stderr), `check stderr 未指出必需项缺失：${c.stderr.trim()}`);
+  assert(/总 Repair/.test(c.stderr), `check stderr 未点名缺失项：${c.stderr.trim()}`);
+
+  const legacy = initDir('mission-section-absent');
+  stripMissionBudget(legacy);
+  const lc = runCli(['check', legacy]);
+  assertEq(lc.status, 0, '整节缺失 → 向后兼容 check exit 0');
+  assert(/向后兼容/.test(lc.stderr), `stderr 未给出兼容警告：${lc.stderr.trim()}`);
+});
+
+// ㉛ 不许误杀：Run 级 current == limit（正常耗尽）时 new-run 仍合法
+test('㉛ 不误杀：Epoch 2 / 2 下 new-run 仍允许并归零', () => {
+  const dir = initDir('new-run-at-limit-allowed');
+  assertEq(runCli(['advance', dir, 'epoch']).status, 0, 'advance epoch #1');
+  assertEq(runCli(['advance', dir, 'epoch']).status, 0, 'advance epoch #2');
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 2 / 2', 'Epoch 恰好到上限');
+  assertEq(runCli(['gate', dir]).status, 1, '触顶时 gate 应 DENY');
+
+  const r = runCli(['new-run', dir]);
+  assertEq(r.status, 0, 'Run 级 == 上限时 new-run 应允许（exit 0，不被误杀）');
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'new-run 后 Epoch 归零');
+  assertEq(counterLine(dir, 'Run'), '- Run: 1 / 3', 'new-run 后 Mission Run +1');
+  assertEq(runCli(['gate', dir]).status, 0, 'new-run 后 gate 应恢复 ALLOW');
+});
+
+// ㉜ 旧文件（缺 Mission Budget 节）advance / new-run 仍可用，且给向后兼容警告
+test('㉜ 旧文件（缺 Mission Budget 节）advance 与 new-run 仍可用并带警告', () => {
+  const dir = initDir('legacy-writes');
+  stripMissionBudget(dir);
+  const a = runCli(['advance', dir, 'cards']);
+  assertEq(a.status, 0, '旧文件 advance cards 退出码');
+  assert(/向后兼容/.test(a.stderr), `advance 未给出兼容警告：${a.stderr.trim()}`);
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 1 / 6', 'Run 级照常递增');
+
+  const n = runCli(['new-run', dir]);
+  assertEq(n.status, 0, '旧文件 new-run 退出码');
+  assert(/向后兼容/.test(n.stderr), `new-run 未给出兼容警告：${n.stderr.trim()}`);
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', '旧文件 new-run 仍重置 Run 级');
+});
+
+// ㉝ 一致性：Run 级非法超限时，status/resume 与 new-run 的判定必须一致（都说"不能开新 Run"）
+test('㉝ Run 级超限时 status --json / resume 也判定不允许开新 Run', () => {
+  const dir = initDir('consistency-over-limit');
+  replaceLine(dir, '- 完成卡数: 0 / 6', '- 完成卡数: 99 / 6');
+
+  const s = runCli(['status', dir, '--json']);
+  assertEq(s.status, 0, 'status --json 退出码');
+  assertEq(JSON.parse(s.stdout).allowNewRun, false, '超限时 allowNewRun 应为 false');
+
+  const r = runCli(['resume', dir]);
+  assertEq(r.status, 1, '超限时 resume 应非零（不得建议机械续跑）');
+  assert(/非法超限/.test(r.stderr), `resume stderr 未指出非法超限：${r.stderr.trim()}`);
+  assert(!/应开新 Run/.test(r.stdout), `超限时不该建议"应开新 Run"：${r.stdout.trim()}`);
+});
+
 /* ──────────────────────────────── 运行器 ──────────────────────────────── */
 
 const failures = [];
 let passed = 0;
+let skipped = 0;
 
 process.stdout.write(
   `runstate v2 测试 · CLI=${CLI} · Node ${process.version}\n` +
     `临时工作目录：${tmpRoot}（跑完自动清理）\n` +
-    (FORCE_FAIL ? '⚠ RS_TEST_FORCE_FAIL=1：已注入一处失败期望，本次结果应为 FAIL 且退出码非 0\n' : '') +
+    (FORCE_FAIL
+      ? '⚠ RS_TEST_FORCE_FAIL=1：已注入用例 ② 的失败期望（check 退出码），本次结果应为 FAIL 且退出码非 0\n'
+      : FORCE_FAIL_GATE
+        ? '⚠ RS_TEST_FORCE_FAIL=2：已注入用例 ⑨ 的失败期望（gate JSON.allow），本次结果应为 FAIL 且退出码非 0\n'
+        : '') +
     '\n',
 );
 
@@ -536,9 +824,16 @@ try {
       passed += 1;
       process.stdout.write(`PASS ${tag} ${c.name}\n`);
     } catch (err) {
-      failures.push(c.name);
-      process.stdout.write(`FAIL ${tag} ${c.name}\n`);
-      process.stdout.write(`      ↳ ${err && err.message ? err.message : String(err)}\n`);
+      if (err instanceof SkipCase) {
+        // 条件跳过：可见地打印 SKIP，且**不**递增 passed（跳过 ≠ 通过）。
+        skipped += 1;
+        process.stdout.write(`SKIP ${tag} ${c.name}\n`);
+        process.stdout.write(`      ↳ ${err.message}\n`);
+      } else {
+        failures.push(c.name);
+        process.stdout.write(`FAIL ${tag} ${c.name}\n`);
+        process.stdout.write(`      ↳ ${err && err.message ? err.message : String(err)}\n`);
+      }
     }
   }
 } finally {
@@ -554,9 +849,21 @@ try {
   }
 }
 
+// 计数自洽：通过 + 跳过 + 失败 必须恰好覆盖全部用例（跳过绝不能被算进通过数）。
+if (passed + skipped + failures.length !== cases.length) {
+  process.stdout.write(
+    `FAIL 计数自洽性：通过 ${passed} + 跳过 ${skipped} + 失败 ${failures.length} ≠ 用例总数 ${cases.length}\n`,
+  );
+  failures.push('计数自洽性');
+}
+
 process.stdout.write(
-  `\n用例总数 ${cases.length}，通过 ${passed}，失败 ${failures.length}\n` +
-    (failures.length > 0 ? `失败用例：${failures.join('；')}\n` : '全部通过 ✔\n'),
+  `\n用例总数 ${cases.length}，通过 ${passed}，跳过 ${skipped}，失败 ${failures.length}\n` +
+    (failures.length > 0
+      ? `失败用例：${failures.join('；')}\n`
+      : skipped > 0
+        ? `无失败 ✔（另有 ${skipped} 条条件跳过，未计入通过数）\n`
+        : '全部通过 ✔（无跳过）\n'),
 );
 
 process.exitCode = failures.length === 0 ? 0 : 1;

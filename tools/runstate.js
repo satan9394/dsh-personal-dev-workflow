@@ -15,6 +15,17 @@
  *     只有 Mission 预算耗尽才升级给人。
  *   - 向后兼容：旧文件缺 `## Mission Budget` 节时按「无上限 + 警告」处理。
  *
+ * v3（F1 状态完整性加固）：
+ *   - `advance` / `new-run` 在**任何写盘之前**做一次整文件状态校验；只要存在状态错误
+ *     （非法计数行 / 同一节内重复标签 / 必需计数行缺失 / 数值超出 Number.MAX_SAFE_INTEGER）
+ *     或任一有限额计数器 `current >= limit`，就整体拒绝（exit 1、stderr 说明、文件字节不变）。
+ *     修复：只校验"自己要改的那一行"导致 Epoch 2/2 触顶后 advance cards 仍改文件（P0-2）、
+ *     文件已非法时 advance 仍写盘（P0-3）、重复标签静默接受（P1-4）、删掉必需计数行仍放行（P1-9）、
+ *     数值越界时静默 no-op 却 exit 0（P1-8）。
+ *   - `new-run` 的合法例外被精确区分：Run 级 `current == limit`（正常耗尽）→ **允许**；
+ *     Run 级 `current > limit`（手工超限，如 99/6）→ **拒绝**，防洗白（P1-5）；
+ *     Mission 级任一 `current >= limit` → **拒绝**并升级给人，且不得烧 Run 配额（P1-6）。
+ *
  * 只使用 node:fs / node:path / process，无任何 npm 依赖；CommonJS（仓库根 package.json 为 "type": "commonjs"）。
  *
  * 退出码约定（与 v1 一致）：
@@ -96,13 +107,27 @@ advance 字段别名（大小写不敏感）:
     runs / totalcards / totalrepairs → 只递增对应的 Mission 级计数器
   任一级的上限会被突破（当前 + 1 > 上限）→ 整体拒绝、退出 1、文件字节不变。
 
+写盘纪律（advance / new-run 共用，整文件校验）:
+  两个写命令在写盘之前都会对整份 RUN_STATE.md 做一次完整校验；只要满足以下任一条，
+  就整体拒绝（exit 1、stderr 说明、文件字节不变），绝不出现"只改自己那一行"的部分写入：
+    1) 状态错误：非法计数行 / 同一节内重复计数标签 / 必需计数行缺失 / 数值越界；
+    2) 任一有限额计数器 current >= limit（任一级耗尽即整体拒绝）。
+  必需计数行: Run 级 4 项（Epoch / 完成卡数 / 已用 Repair / 已派子代理）、
+              Mission 级 3 项（Run / 总卡数 / 总 Repair）；
+  "节存在而计数行不全" = 状态错误；整个 ## Mission Budget 节缺失 = 向后兼容豁免（带警告）。
+  数值越界: 任一计数值或上限 > Number.MAX_SAFE_INTEGER（9007199254740991）→ 状态错误。
+
 new-run 语义（Run 边界：机械续跑，不找人）:
   把 Run 级计数器（Epoch / 完成卡数 / 已用 Repair / 已派子代理）重置为 0；
   把 Mission 级「Run」+1（新 Run 编号 = 递增后的 Mission Run 当前值）；
   Mission 级总量（总卡数 / 总 Repair）是记忆，不重置。
   适用场景: Run 预算耗尽而 Mission 仍有余额 → 在新上下文里续跑，无需人工确认。
-  拒绝条件: Mission 级「Run」已达上限（当前 >= 上限）→ 拒绝、退出 1、文件字节不变，
-            此时才升级给人（加预算或收尾）。
+  拒绝条件（写盘前整文件校验，任一命中即 exit 1、文件字节不变）:
+    1) 状态错误（同 advance：非法行 / 重复标签 / 必需项缺失 / 数值越界）；
+    2) Run 级任一计数器 current > limit（非法超限，如 99 / 6 —— 防把手工超限洗白）；
+    3) Mission 级任一计数器 current >= limit（Mission 预算耗尽 → 升级给人，不烧 Run 配额）。
+  合法例外: Run 级任一计数器 current == limit（正常耗尽）→ **允许** new-run，
+            这正是 new-run 存在的理由（把耗尽的 Run 归零），不得误杀。
   旧版文件缺 ## Mission Budget 节 → 按「无上限 + 警告」处理：仍重置 Run 级，跳过 Mission Run 递增。
 
 退出码:
@@ -253,10 +278,20 @@ function fieldList() {
 }
 
 /**
- * new-run 重置的 Run 级计数器标签（模板顺序，与 USAGE 中列的四项一致）。
+ * P1-9 必需计数行（顺序与模板 / USAGE 一致）：
+ *   - Run 级 4 项：Epoch / 完成卡数 / 已用 Repair / 已派子代理
+ *   - Mission 级 3 项：Run / 总卡数 / 总 Repair
+ * "节存在而计数行不全" = 状态错误；整个 ## Mission Budget 节缺失时按向后兼容豁免
+ * Mission 级必需项（见 analyzeLevels）。
+ */
+const RUN_REQUIRED_LABELS = ['Epoch', '完成卡数', '已用 Repair', '已派子代理'];
+const MISSION_REQUIRED_LABELS = ['Run', '总卡数', '总 Repair'];
+
+/**
+ * new-run 重置的 Run 级计数器标签（= Run 级必需项，模板顺序一致）。
  * Mission 级「Run」由 new-run 单独 +1；Mission 级总量（总卡数 / 总 Repair）不在此列表，保留为记忆。
  */
-const NEW_RUN_RESET_LABELS = ['Epoch', '完成卡数', '已用 Repair', '已派子代理'];
+const NEW_RUN_RESET_LABELS = RUN_REQUIRED_LABELS;
 
 /** 按「含行尾符」切行：未改动的行原样拼接回去，保证字节级不变。 */
 function splitLines(text) {
@@ -270,9 +305,23 @@ function splitLines(text) {
 const BUDGET_LINE_RE = /^(\s*[-*]\s*)([^:：]+?)(\s*[:：]\s*)(.*)$/;
 
 /**
+ * Number.MAX_SAFE_INTEGER 的十进制字面量（9007199254740991 = 2^53 - 1）。
+ * 必须按**字符串**比较：`Number('9007199254740993')` 会被舍入成 `9007199254740992`，
+ * 用数值比较会把 P1-8 这类越界值误判为合法，于是 `advance` 静默 no-op 却 exit 0。
+ */
+const MAX_SAFE_DIGITS = String(Number.MAX_SAFE_INTEGER);
+
+/** 十进制整数字面量是否超出安全整数范围（去掉前导零后按等长/长度比较）。 */
+function exceedsSafeInteger(digits) {
+  const normalized = digits.replace(/^0+(?=\d)/, '');
+  if (normalized.length !== MAX_SAFE_DIGITS.length) return normalized.length > MAX_SAFE_DIGITS.length;
+  return normalized > MAX_SAFE_DIGITS;
+}
+
+/**
  * 严格解析计数值：`当前整数 [ / 上限整数 ] [行内备注]`。
  *
- * 合法 → { current, limit, note, digits }；当前值或上限不是合法整数 → null。
+ * 合法 → { current, limit, note, digits, limitDigits, unsafe }；格式非法 → null。
  * 区分「合法但无上限」与「格式非法」的界线：
  *   - 没有 "/" 分隔符 → 合法，limit = null（如 `- 已派子代理: 0`）；
  *     但值以 "/" 或全角 "／" 开头（如 `0 /`、`0 ／ 3`）→ 非法：本想写上限，
@@ -290,14 +339,16 @@ function parseCounterValue(rawValue) {
   const digits = cur[1];
   let rest = value.slice(digits.length);
   let limit = null;
+  let limitDigits = null;
 
   const slash = /^\s*\/\s*/.exec(rest);
   if (slash) {
     rest = rest.slice(slash[0].length);
     const lim = /^(\d+)/.exec(rest);
     if (!lim) return null; // 有 "/" 却取不出上限整数（如 "1 / xyz"、"1 /"）
-    limit = Number(lim[1]);
-    rest = rest.slice(lim[1].length);
+    limitDigits = lim[1];
+    limit = Number(limitDigits);
+    rest = rest.slice(limitDigits.length);
   } else if (/^[／/]/.test(rest.trim())) {
     return null; // 斜杠没走成 "当前 / 上限"（全角 ／ 等）：按格式非法处理
   }
@@ -305,7 +356,15 @@ function parseCounterValue(rawValue) {
   // 剩余部分只能是空串，或「分隔符 + 备注」；否则就是 "0abc" 这类写坏的值
   if (rest !== '' && !/^(\s|[（(←]|[^\x00-\x7F])/.test(rest)) return null;
 
-  return { current: Number(digits), limit, note: rest, digits };
+  return {
+    current: Number(digits),
+    limit,
+    note: rest,
+    digits,
+    limitDigits,
+    // P1-8：当前值或上限任一超出安全整数范围 → 该行标记为不安全（由 analyzeLevels 判为状态错误）。
+    unsafe: exceedsSafeInteger(digits) || (limitDigits !== null && exceedsSafeInteger(limitDigits)),
+  };
 }
 
 /**
@@ -382,6 +441,14 @@ function malformedMessage(level, entry) {
   );
 }
 
+/** 「数值越界」的统一说明（P1-8：> Number.MAX_SAFE_INTEGER 的整数无法被安全地 +1）。 */
+function unsafeMessage(level, entry) {
+  return (
+    `## ${level.section} 第 ${entry.lineNo} 行计数数值超出安全整数范围（> ${MAX_SAFE_DIGITS}）: ` +
+    `"${entry.body}"（拒绝写入：该值 +1 会因浮点舍入变成 no-op）`
+  );
+}
+
 /** 计数行的机器可读形态（status --json / gate 共用）。 */
 function counterJson(entry) {
   return {
@@ -394,15 +461,22 @@ function counterJson(entry) {
 }
 
 /**
- * 统一的两级预算分析：严格校验 + 触顶判定（check / status / gate / resume 共用）。
+ * 统一的两级预算分析：整文件严格校验 + 触顶判定
+ * （check / status / gate / resume / advance / new-run 共用同一份判定，避免各处语义漂移）。
+ *
+ * 校验项（任一命中即进入 errors，写命令据此整体拒绝、绝不落盘）：
+ *   1) 计数行格式非法（如 `- 完成卡数: abc / 2`）——P0-3；
+ *   2) 同一节内同名计数标签重复出现——P1-4（advance 只改第一份会造成计数器分叉）；
+ *   3) 必需计数行缺失——P1-9（Run 级 4 项 / Mission 级 3 项；整节缺失按向后兼容豁免）；
+ *   4) 当前值或上限超出 Number.MAX_SAFE_INTEGER——P1-8（否则会静默 no-op 却 exit 0）。
  *
  * 返回 {
  *   run, mission,     // 每级 { name, section, present, lines, counters, exhausted }
- *   errors: string[], // 状态错误（格式非法、有节但无计数行）
+ *   errors: string[], // 状态错误（格式非法、重复标签、必需项缺失、数值越界、必需节缺失）
  *   warnings: string[],// 向后兼容警告（缺 ## Mission Budget 等）
  *   exhausted: [{ level, label, current, limit }],
  * }
- * 触顶判定：有限额且 当前 >= 上限（与 v1 一致；到达上限不拦截，再 +1 才拦截）。
+ * 触顶判定：有限额且 `current >= limit`。写命令在此之上再收紧（见 cmdAdvance / cmdNewRun）。
  */
 function analyzeLevels(text) {
   const levels = readLevels(text);
@@ -414,8 +488,30 @@ function analyzeLevels(text) {
     const malformed = level.lines.filter((line) => line.parsed === null);
     for (const line of malformed) errors.push(malformedMessage(level, line));
 
+    // P1-8：数值越界 → 状态错误（绝不再出现"静默 no-op 却 exit 0"）。
+    for (const line of level.lines) {
+      if (line.parsed && line.parsed.unsafe) errors.push(unsafeMessage(level, line));
+    }
+
+    // P1-4：同一节内同名计数标签重复 → 状态错误（写命令拒写，避免计数器分叉）。
+    const byLabel = new Map();
+    for (const line of level.lines) {
+      const key = line.label.toLowerCase();
+      if (!byLabel.has(key)) byLabel.set(key, []);
+      byLabel.get(key).push(line);
+    }
+    for (const group of byLabel.values()) {
+      if (group.length > 1) {
+        errors.push(
+          `## ${level.section} 节内计数标签「${group[0].label}」重复出现（第 ` +
+            `${group.map((line) => line.lineNo).join(' 行 / ')} 行）：同一节内同名计数标签只能出现一次`,
+        );
+      }
+    }
+
     if (!level.present) {
       // 向后兼容：旧文件没有 ## Mission Budget → 按「无上限 + 警告」处理，不算错误。
+      // 整节缺失 → 豁免"Mission 级必需项"；只有"节存在而计数行不全"才判错（P1-9）。
       if (level.name === 'mission') {
         level.warning =
           `缺少 ## ${level.section} 节：按「无上限 + 警告」处理（向后兼容旧版 RUN_STATE.md）；` +
@@ -424,8 +520,17 @@ function analyzeLevels(text) {
       } else {
         errors.push(`缺少 ## ${level.section} 节`);
       }
-    } else if (malformed.length === 0 && level.lines.length === 0) {
-      errors.push(`## ${level.section} 节内没有可识别的计数行（形如 "- Epoch: 0 / 2"）`);
+    } else {
+      // P1-9：必需计数行完整性（Run 级 4 项 / Mission 级 3 项），缺失即状态错误。
+      const required = level.name === 'mission' ? MISSION_REQUIRED_LABELS : RUN_REQUIRED_LABELS;
+      const presentLabels = new Set(level.lines.map((line) => line.label.toLowerCase()));
+      const missing = required.filter((label) => !presentLabels.has(label.toLowerCase()));
+      if (missing.length > 0) {
+        errors.push(
+          `## ${level.section} 节缺少必需计数行: ${missing.join(' / ')}` +
+            `（该节现有 ${level.lines.length} 条计数行，必需 ${required.length} 项）`,
+        );
+      }
     }
 
     level.counters = level.lines.filter((line) => line.parsed !== null).map(counterJson);
@@ -581,9 +686,10 @@ function cmdCheck(argv) {
 /**
  * advance <dir> <field>：按 ADVANCE_PLAN 推进计数器并写回。
  *
- * 原子性：先做全部校验与两级预算判断，只有确定可以写入时才落盘；
- * 任何拒绝路径都直接返回，绝不触碰文件（拒绝后文件字节不变）。
- * 任一级触顶（即使另一级还有余量）→ 整体拒绝，不做部分写入。
+ * 原子性（P0-2 / P0-3 的核心修复）：先对**整份文件**做一次完整状态校验（analyzeLevels），
+ * 只要存在状态错误（非法行 / 重复标签 / 必需项缺失 / 数值越界）或
+ * **任一**有限额计数器 current >= limit，就整体拒绝——不是只校验"自己要改的那一行"。
+ * 任何拒绝路径都在写文件之前返回，绝不触碰文件（拒绝后文件字节不变）。
  */
 function cmdAdvance(argv) {
   const dir = argv[0];
@@ -610,7 +716,29 @@ function cmdAdvance(argv) {
   if (read.error) return fail(read.error, EXIT_STATE);
   const text = read.text;
 
-  const levels = readLevels(text);
+  // ── 写盘前整文件校验（先校验、后写盘；此刻文件仍未被触碰）──
+  const analysis = analyzeLevels(text);
+  emitWarnings(analysis.warnings);
+
+  if (analysis.errors.length > 0) {
+    for (const message of analysis.errors) process.stderr.write(`runstate: 错误: ${message}\n`);
+    process.stderr.write(
+      `runstate: 错误: 状态校验未通过（${analysis.errors.length} 处），拒绝递增 "${alias}"；` +
+        '文件未做任何修改。\n',
+    );
+    return EXIT_STATE;
+  }
+
+  if (analysis.exhausted.length > 0) {
+    process.stderr.write(
+      `runstate: 错误: 预算守卫拒绝递增：${analysis.exhausted.map(exhaustedText).join('，')} 已达上限；` +
+        '任一级任一有限额计数器触顶即整体拒绝（不做部分写入）\n',
+    );
+    process.stderr.write('文件未做任何修改。\n');
+    return EXIT_STATE;
+  }
+
+  const levels = { run: analysis.run, mission: analysis.mission };
   const lines = splitLines(text);
   const advanced = [];
   const blocked = [];
@@ -620,22 +748,13 @@ function cmdAdvance(argv) {
     const sameLabel = (line) => line.label.toLowerCase() === wanted.label.toLowerCase();
 
     if (!level.present) {
-      // 向后兼容：旧文件缺 ## Mission Budget → 该级按「无上限」处理，本次跳过并警告。
-      warn(
-        `缺少 ## ${level.section} 节：按「无上限 + 警告」处理（向后兼容），` +
-          `本次不递增 ${levelTitle(level)} 的 ${wanted.label}`,
-      );
+      // 向后兼容：旧文件缺 ## Mission Budget → 该级按「无上限」处理，本次跳过（警告已在上方给出）。
       continue;
-    }
-
-    // 目标计数器所在行格式非法 → 拒绝；拒绝路径在写文件之前返回，文件字节不变。
-    const broken = level.lines.find((line) => sameLabel(line) && line.parsed === null);
-    if (broken) {
-      return fail(`${malformedMessage(level, broken)}；文件未做任何修改`, EXIT_STATE);
     }
 
     const entry = level.lines.find(sameLabel);
     if (!entry) {
+      // 整文件校验（P1-9 必需项）已保证必需标签齐全，这里是防御性兜底。
       const labels = level.lines.map((e) => e.label).join(' / ') || '（无）';
       return fail(
         `${statePath} 的 ## ${level.section} 节里没有 "${wanted.label}"（字段 ${alias}）；现有计数行: ${labels}`,
@@ -645,6 +764,7 @@ function cmdAdvance(argv) {
 
     const next = entry.current + 1;
     if (entry.limit !== null && next > entry.limit) {
+      // 兜底（上面的整文件触顶判定已先一步拦截）：仍不做部分写入。
       blocked.push({ level, entry, next });
       continue;
     }
@@ -710,15 +830,19 @@ function replanText(alias) {
 /**
  * new-run <dir>：开新 Run（Run 边界 = 机械续跑，不找人）。
  *
- * 语义（任务卡 C1b）：
+ * 语义（任务卡 C1b + F1 加固）：
  *   - Run 级四项（Epoch / 完成卡数 / 已用 Repair / 已派子代理）重置为 0；
- *   - Mission 级「Run」+1（新 Run 编号 = 递增后的当前值）；Mission 级总量作为记忆保留；
- *   - Mission 级「Run」已达上限（当前 >= 上限）→ 拒绝、退出 1、文件字节不变；
- *     这是唯一需要升级给人的分支（Mission 预算耗尽才找人）。
+ *   - Mission 级「Run」+1（新 Run 编号 = 递增后的当前值）；Mission 级总量作为记忆保留。
  *
- * 原子性：先完成全部校验与「触顶拒绝」判定，只有确定可以写入时才落盘；
+ * 原子性：先完成**整文件**校验与「拒绝条件」判定，只有确定可以写入时才落盘；
  * 任何拒绝路径都在写文件之前返回，绝不触碰文件（拒绝后文件字节不变）。
- * 拒绝时不做部分重置：Mission Run 拒绝 → Run 级四项一格都不动。
+ * 拒绝时不做部分重置：任一条拒绝 → Run 级四项一格都不动。
+ *
+ * 拒绝条件（P1-5 / P1-6，写盘前判定）：
+ *   1) 状态错误（非法行 / 重复标签 / 必需项缺失 / 数值越界）；
+ *   2) Run 级任一计数器 current > limit（非法超限，如 99/6）→ 拒绝，防洗白；
+ *   3) Mission 级任一计数器 current >= limit → 拒绝，升级给人，不烧 Run 配额。
+ * 合法例外（不得误杀）：Run 级任一计数器 current == limit（正常耗尽）→ 允许 new-run。
  *
  * 向后兼容：旧文件缺 ## Mission Budget 节 → 按「无上限 + 警告」处理
  * （与 advance 一致）：仍重置 Run 级四项，跳过 Mission Run 递增并警告。
@@ -733,23 +857,53 @@ function cmdNewRun(argv) {
   if (read.error) return fail(read.error, EXIT_STATE);
   const text = read.text;
 
-  const levels = readLevels(text);
+  // ── 写盘前整文件校验（与 advance 共用同一份判定；此刻文件仍未被触碰）──
+  const analysis = analyzeLevels(text);
+  emitWarnings(analysis.warnings);
 
-  // ── 第一步：Mission 级「Run」判定（触顶即拒绝，此刻文件仍未被触碰）──
+  if (analysis.errors.length > 0) {
+    for (const message of analysis.errors) process.stderr.write(`runstate: 错误: ${message}\n`);
+    process.stderr.write(
+      `runstate: 错误: 状态校验未通过（${analysis.errors.length} 处），拒绝开新 Run；` +
+        '文件未做任何修改。\n',
+    );
+    return EXIT_STATE;
+  }
+
+  const levels = { run: analysis.run, mission: analysis.mission };
+
+  // ── 第一步：Mission 级判定 —— 任一有限额计数器 current >= limit → 拒绝（不烧 Run 配额，P1-6）──
+  const missionSpent = analysis.exhausted.filter((item) => item.level === 'mission');
+  if (missionSpent.length > 0) {
+    process.stderr.write(
+      `runstate: 错误: Mission 预算守卫拒绝开新 Run：${missionSpent.map(exhaustedText).join('，')} 已达上限；` +
+        'Mission 预算已耗尽，必须升级给人（加预算或收尾），不得再烧 Run 配额。\n',
+    );
+    process.stderr.write('文件未做任何修改。\n');
+    info('新 Run 拒绝：Mission 预算已用尽，需人工决定加预算或收尾。');
+    return EXIT_STATE;
+  }
+
+  // ── 第二步：Run 级判定 —— current > limit 是非法超限（P1-5：防 99/6 被洗白）；
+  //      current == limit 是"正常耗尽"，恰恰是 new-run 存在的理由 → 允许，不得误杀。
+  const runOverflow = runOverLimitLines(analysis);
+  if (runOverflow.length > 0) {
+    const detail = runOverflow
+      .map((line) => `${levelTitle(levels.run)}「${line.label}」${line.current} / ${line.limit}`)
+      .join('，');
+    process.stderr.write(
+      `runstate: 错误: 非法超限状态：${detail}（当前值 > 上限）；` +
+        'new-run 只把「恰好耗尽（== 上限）」的 Run 级计数器归零，不能用来洗白手工超限的计数；' +
+        '请先修好状态文件。\n',
+    );
+    process.stderr.write('文件未做任何修改。\n');
+    return EXIT_STATE;
+  }
+
+  // ── 第三步：Mission 级「Run」递增计划（缺节 → 向后兼容跳过，警告已在上方给出）──
   let missionRun = null;
   let missionRunNext = null;
-  if (!levels.mission.present) {
-    // 向后兼容：缺节 → 按无上限处理，只警告，仍允许重置 Run 级。
-    warn(
-      `缺少 ## ${MISSION_SECTION} 节：按「无上限 + 警告」处理（向后兼容），` +
-        `本次不递增 Mission 级 Run`,
-    );
-  } else {
-    const broken = levels.mission.lines.find(
-      (line) => line.label.toLowerCase() === 'run' && line.parsed === null,
-    );
-    if (broken) return fail(`${malformedMessage(levels.mission, broken)}；文件未做任何修改`, EXIT_STATE);
-
+  if (levels.mission.present) {
     missionRun = levels.mission.lines.find((line) => line.label.toLowerCase() === 'run') || null;
     if (!missionRun) {
       const labels = levels.mission.lines.map((e) => e.label).join(' / ') || '（无）';
@@ -758,34 +912,13 @@ function cmdNewRun(argv) {
         EXIT_STATE,
       );
     }
-
-    // 触顶判定：当前 >= 上限 即视为已用尽（与 analyzeLevels 的触顶语义一致）。
-    if (missionRun.limit !== null && missionRun.current >= missionRun.limit) {
-      process.stderr.write(
-        `runstate: 错误: Mission 预算守卫拒绝开新 Run：Mission 级「Run」已达上限 ` +
-          `${missionRun.current} / ${missionRun.limit}（再开一个 Run 会变成 ` +
-          `${missionRun.current + 1} / ${missionRun.limit}）；` +
-          'Mission 预算已耗尽，必须升级给人（加预算或收尾），不要再机械续跑。\n',
-      );
-      process.stderr.write('文件未做任何修改。\n');
-      info(
-        `新 Run 拒绝：Mission 级 Run 已用尽（${missionRun.current} / ${missionRun.limit}），` +
-          '需人工决定加预算或收尾。',
-      );
-      return EXIT_STATE;
-    }
     missionRunNext = missionRun.current + 1;
   }
 
-  // ── 第二步：Run 级四项的重置计划（逐项核对，任一项不可用即整体拒绝）──
+  // ── 第四步：Run 级四项的重置计划（必需项已由整文件校验保证齐全）──
   const resets = [];
   for (const label of NEW_RUN_RESET_LABELS) {
-    const sameLabel = (line) => line.label.toLowerCase() === label.toLowerCase();
-
-    const broken = levels.run.lines.find((line) => sameLabel(line) && line.parsed === null);
-    if (broken) return fail(`${malformedMessage(levels.run, broken)}；文件未做任何修改`, EXIT_STATE);
-
-    const entry = levels.run.lines.find(sameLabel);
+    const entry = levels.run.lines.find((line) => line.label.toLowerCase() === label.toLowerCase());
     if (!entry) {
       const labels = levels.run.lines.map((e) => e.label).join(' / ') || '（无）';
       return fail(
@@ -796,7 +929,7 @@ function cmdNewRun(argv) {
     resets.push({ entry, from: entry.current });
   }
 
-  // ── 第三步：全部校验通过后才落盘（只替换数字位，其余字节原样保留）──
+  // ── 第五步：全部校验通过后才落盘（只替换数字位，其余字节原样保留）──
   const lines = splitLines(text);
   for (const item of resets) {
     lines[item.entry.index] = item.entry.prefix + '0' + item.entry.tail + item.entry.eol;
@@ -924,12 +1057,26 @@ function printLevel(level) {
 }
 
 /**
+ * Run 级「当前值 > 上限」的非法超限行（P1-5）。
+ * new-run 只处理"恰好耗尽（== 上限）"的正常边界，不能用来洗白超限计数；
+ * 抽成共用判定，保证 cmdNewRun 与 computeAllowNewRun（status / resume）给出同一个答案。
+ */
+function runOverLimitLines(analysis) {
+  if (!analysis.run.present) return [];
+  return analysis.run.lines.filter(
+    (line) => line.parsed && line.limit !== null && line.current > line.limit,
+  );
+}
+
+/**
  * 是否还允许开新 Run：
+ *   0) Run 级不存在「当前值 > 上限」的非法超限（P1-5：这种状态下 new-run 会拒绝）；
  *   1) Mission 级任一有限额计数器未触顶；
  *   2) Mission 级的 Run 配额未用尽（无上限视为未用尽）；
  *   3) 缺 ## Mission Budget 节（旧文件）→ 按无上限，视为允许（并已在 warnings 里警告）。
  */
 function computeAllowNewRun(analysis) {
+  if (runOverLimitLines(analysis).length > 0) return false;
   if (analysis.mission.exhausted) return false;
   if (!analysis.mission.present) return true;
   const runCounter = analysis.mission.counters.find((c) => c.label.toLowerCase() === 'run');
@@ -998,6 +1145,18 @@ function cmdResume(argv) {
   }
 
   if (runExhausted) {
+    if (!allowNewRun) {
+      // Run 级存在"当前值 > 上限"的非法超限（P1-5 同类状态）：new-run 会拒绝，不能建议机械续跑。
+      const detail = runOverLimitLines(analysis)
+        .map((line) => `${line.label} ${line.current} / ${line.limit}`)
+        .join('，');
+      process.stderr.write(
+        `runstate: 错误: Run 级存在非法超限状态（${detail}）：new-run 只处理"恰好耗尽 == 上限"，` +
+          '不能用来洗白超限计数；请先修好状态文件，再决定续跑或收尾。\n',
+      );
+      info('恢复计划: 不可用（Run 级非法超限，new-run 不可用，需先修状态文件）');
+      return EXIT_STATE;
+    }
     info(
       '恢复计划: 应开新 Run（新上下文）—— 本 Run 预算已耗尽，Mission 仍有余额；' +
         '请执行 `new-run <dir>` 开新 Run 并在新上下文内续跑，无需人工确认（仅 Mission 预算耗尽才升级给人）。',
