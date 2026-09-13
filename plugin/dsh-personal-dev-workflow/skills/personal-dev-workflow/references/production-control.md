@@ -52,14 +52,22 @@ Budgets have two levels, both written in `RUN_STATE.md`. Completing one card inc
 
 **Run Budget — `## Budget`.** Purpose: prevent context pollution, token blow-up and an over-long single session. It is *run hygiene*, not a scope limit.
 
+`init` scaffolds the **8 counter lines** below; their labels map verbatim to the `advance` field aliases in `runstate.js`, and the limits actually written in the file win.
+
 | Counter (label in `RUN_STATE.md`) | Default | Notes |
 |---|---|---|
 | `Epoch` | ≤ 2 | one epoch = one scheduling + execution round |
 | `完成卡数` (cards completed) | ≤ 6 | more means the Run's scope was too broad |
 | `已用 Repair` (repairs used) | ≤ 1 | second failure → `BLOCKED` |
-| `已派子代理` (subagents spawned) | no cap | still bounded by workers 2 (max 3), subagent depth 1, evaluator 1, research pass 1 |
+| `已派子代理` (subagents spawned) | ≤ 8 | `advance <dir> subagents`; still bounded by `Worker 数` and `子代理嵌套` |
+| `WorkSet 规模` (workset size) | ≤ 8 | cards materialised in this Run (a blocker replaces, never enlarges); alias `workset` |
+| `Worker 数` (workers) | ≤ 3 | parallel workers (default 2, max 3); alias `workers` |
+| `Research pass` | ≤ 1 | at most one research round per Run; alias `research` |
+| `子代理嵌套` (subagent nesting) | ≤ 1 | subagents may nest one level only; alias `depth` |
 
-**Run Budget exhausted → mechanical continuation, not a human decision:** write `RUN_STATE.md`, then run `node tools/runstate.js new-run <project-root>`. That resets the four Run counters to 0 and increments Mission `Run`; work continues in a fresh context. Do not ask the human, and do not grind on in the old context.
+On an old `RUN_STATE.md` (v0.5.1 and earlier) the last 4 lines are absent, or `已派子代理` / `Worker 数` are written in the legacy unlimited form (e.g. `- Worker 数: 2（上限 3）`, where "上限 3" is only a note): `check` still exits **0**, printing a warning that lists what is missing; `advance` / `new-run` / `gate` behave unchanged. Add the lines to gain the corresponding hard caps.
+
+**Run Budget exhausted → mechanical continuation, not a human decision:** write `RUN_STATE.md`, then run `node tools/runstate.js new-run <project-root>`. That resets all **8 Run counters** to 0 (missing legacy lines are skipped) and increments Mission `Run`; work continues in a fresh context. Do not ask the human, and do not grind on in the old context.
 
 **Mission Budget — `## Mission Budget`.** Purpose: the fuse for the whole Mission across all Runs. `new-run` never resets it.
 
@@ -80,13 +88,13 @@ Zero-dependency. Keep `RUN_STATE.md` parseable and drive the counters through th
 | Command | When / what |
 |---|---|
 | `gate <project-root>` | **before every dispatch.** `{"allow":true}` with exit 0 authorizes the dispatch. Exit 1 (`{"allow":false,"reason":…}`) → stop, checkpoint, do not dispatch. On DSH this same command is what the host gate (`n3-budget-gate`) runs automatically before `subagent` / `subagent_fork` / `workflow` / `ralph` — see §10 |
-| `advance <dir> <field>` | count work as it happens. Run fields: `epoch` / `cards` / `repairs` / `subagents`. Mission fields: `runs` / `totalcards` / `totalrepairs`. `cards` and `repairs` increment both levels |
+| `advance <dir> <field>` | count work as it happens. Run fields (8): `epoch` / `cards` / `repairs` / `subagents` / `workset` / `workers` / `research` / `depth`. Mission fields (3): `runs` / `totalcards` / `totalrepairs`. `cards` and `repairs` increment both levels; when any limited counter is at its cap, **every** `advance` is refused as a whole and the file stays byte-identical |
 | `status <dir> [--json]` | two-level summary; `--json` is the machine-readable form (`exhausted`, `allowNewRun`, per-level counters). Its exit code stays 0 even at a cap — use `gate` for the allow/deny decision |
 | `resume <dir>` | prints the recovery plan (Resume From + next step + whether a new Run is still allowed); exits 1 only when the Mission budget is exhausted |
 | `new-run <dir>` | opens a new Run (Run counters → 0, Mission `Run` +1); refused with exit 1 only when Mission `Run` is at its cap |
 | `check <dir>` / `init <dir>` | strict validation (a malformed counter line is an error, reported with its line number) / scaffold the 12-section `RUN_STATE.md` |
 
-Exit codes: `0` success · `1` state / validation / budget error (including a `gate` deny) · `2` usage error. On an old file without `## Mission Budget`, the Mission level is treated as unlimited **with a warning** (backward compatible), never as an error.
+Exit codes: `0` success · `1` state / validation / budget error (including a `gate` deny) · `2` usage error. On an old file without `## Mission Budget`, the Mission level is treated as unlimited **with a warning** (backward compatible), never as an error. The same holds for an old file missing the `WorkSet 规模` / `Worker 数` / `Research pass` / `子代理嵌套` lines (or writing them without a cap): a warning that lists what is missing, still exit 0 — only a label that is present with an invalid or duplicated value is an error.
 
 ## 6. Stop conditions — write `RUN_STATE.md`, then stop
 

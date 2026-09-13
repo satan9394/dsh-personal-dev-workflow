@@ -5,7 +5,10 @@
  * 覆盖：两级预算（Run / Mission）、advance 组合语义与原子拒绝、check/status/resume/gate、
  *       new-run（Run 边界机械续跑：Run 级四项归零 + Mission Run +1，Mission Run 触顶则拒绝）、
  *       F1 状态完整性加固（整文件写前校验：触顶后一律拒写 / 非法文件拒写 / 重复标签 / 必需项缺失 /
- *       数值越界；new-run 的 == 允许 vs > 拒绝 vs Mission >= 拒绝；向后兼容边界）。
+ *       数值越界；new-run 的 == 允许 vs > 拒绝 vs Mission >= 拒绝；向后兼容边界）、
+ *       F2 机械见证（## Budget 8 条 Run 级计数行；workset/workers/research/depth 四个新别名；
+ *       5 条上限任一触顶即整体拒绝；缺新行的旧文件 check exit 0 + 警告；gate 在 WorkSet 触顶时 DENY；
+ *       中英文档与 CLI 标签的逐字对照）。
  *
  * 设计要点：
  *   - 只用 node: 内置模块；通过 child_process 调本仓 tools/runstate.js（只看黑盒行为，不依赖内部实现）。
@@ -120,6 +123,22 @@ function setLimit(dir, label, value) {
   writeState(dir, text.replace(re, `$1${value}`));
 }
 
+/** 取某个二级标题节的正文（不含标题行）；用于数「## Budget 里有几条计数行」。 */
+function sectionBody(dir, title) {
+  const target = title.toLowerCase();
+  const out = [];
+  let inside = false;
+  for (const line of readState(dir).split(/\r?\n/)) {
+    const heading = /^##\s+(.*\S)\s*$/.exec(line);
+    if (heading) {
+      inside = heading[1].split(/[（(]/)[0].trim().toLowerCase() === target;
+      continue;
+    }
+    if (inside) out.push(line);
+  }
+  return out.join('\n');
+}
+
 /** 摘掉整个 ## Mission Budget 节（模拟 v1 旧文件，测向后兼容）。 */
 function stripMissionBudget(dir) {
   const lines = readState(dir).split(/\r?\n/);
@@ -197,6 +216,11 @@ test('① init 生成 12 节（含 ## Mission Budget）', () => {
   assert(/^- Run: 0 \/ 3$/m.test(readState(dir)), 'Mission Budget 骨架缺 "- Run: 0 / 3"');
   assert(/^- 总卡数: 0 \/ 12$/m.test(readState(dir)), 'Mission Budget 骨架缺 "- 总卡数: 0 / 12"');
   assert(/^- 总 Repair: 0 \/ 3$/m.test(readState(dir)), 'Mission Budget 骨架缺 "- 总 Repair: 0 / 3"');
+  // F2：## Budget 由 4 条增为 8 条（计数行条数由用例 ㉞ 细查）
+  const runLines = sectionBody(dir, 'Budget')
+    .split(/\r?\n/)
+    .filter((l) => /^\s*[-*]\s+\S/.test(l));
+  assertEq(runLines.length, 8, '## Budget 计数行数（F2 后应为 8）');
 });
 
 // ② 合法骨架 check → exit 0
@@ -316,7 +340,7 @@ test('⑧ gate 允许时 exit 0 且 JSON.allow=true', () => {
   assert(typeof parsed.reason === 'string' && parsed.reason.length > 0, 'reason 应非空');
   assert(parsed.run && Array.isArray(parsed.run.counters), 'JSON.run.counters 应为数组');
   assert(parsed.mission && Array.isArray(parsed.mission.counters), 'JSON.mission.counters 应为数组');
-  assertEq(parsed.run.counters.length, 4, 'Run 级计数器条数');
+  assertEq(parsed.run.counters.length, 8, 'Run 级计数器条数（F2 后为 8）');
   assertEq(parsed.mission.counters.length, 3, 'Mission 级计数器条数');
   // 推进一格后仍允许
   assertEq(runCli(['advance', dir, 'cards']).status, 0, 'advance 退出码');
@@ -438,7 +462,7 @@ test('⑯ status 打印两级摘要，--json 可解析', () => {
   const json = runCli(['status', dir, '--json']);
   assertEq(json.status, 0, 'status --json 退出码');
   const parsed = JSON.parse(json.stdout);
-  assertEq(parsed.run.counters.length, 4, 'JSON run 计数器条数');
+  assertEq(parsed.run.counters.length, 8, 'JSON run 计数器条数（F2 后为 8）');
   assertEq(parsed.mission.counters.length, 3, 'JSON mission 计数器条数');
   const cards = parsed.run.counters.find((c) => c.label === '完成卡数');
   assertEq(cards.current, 1, 'JSON run 完成卡数当前值');
@@ -471,16 +495,16 @@ test('⑱ new-run 后 Run 级四项归零且 Mission Run +1', () => {
   assertEq(counterLine(dir, 'Epoch'), '- Epoch: 1 / 2', '推进后 Epoch');
   assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 1 / 6', '推进后 完成卡数');
   assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 1 / 1', '推进后 已用 Repair');
-  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 1', '推进后 已派子代理');
+  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 1 / 8', '推进后 已派子代理');
   assertEq(counterLine(dir, 'Run'), '- Run: 0 / 3', 'new-run 前 Mission Run');
 
   const r = runCli(['new-run', dir]);
   assertEq(r.status, 0, 'new-run 退出码');
-  // Run 级四项归零（不改上限、不动其它节）
+  // Run 级 8 项归零（不改上限、不动其它节）
   assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'new-run 后 Epoch');
   assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', 'new-run 后 完成卡数');
   assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 0 / 1', 'new-run 后 已用 Repair');
-  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 0', 'new-run 后 已派子代理');
+  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 0 / 8', 'new-run 后 已派子代理');
   // Mission Run +1，Mission 总量是记忆、不得被重置
   assertEq(counterLine(dir, 'Run'), '- Run: 1 / 3', 'new-run 后 Mission Run');
   assertEq(counterLine(dir, '总卡数'), '- 总卡数: 1 / 12', 'Mission 总卡数不该被重置');
@@ -713,7 +737,7 @@ test('㉘ P1-8 数值超 Number.MAX_SAFE_INTEGER → check 非零且 advance 拒
 
   // 边界不误杀：恰好等于 MAX_SAFE_INTEGER（9007199254740991）且无上限 → 仍合法
   const edge = initDir('p1-8-boundary');
-  replaceLine(edge, '- 已派子代理: 0', '- 已派子代理: 9007199254740991');
+  replaceLine(edge, '- 已派子代理: 0 / 8', '- 已派子代理: 9007199254740991');
   const ec = runCli(['check', edge]);
   assertEq(ec.status, 0, '边界值（== MAX_SAFE_INTEGER，无上限）check 应通过');
   assert(!/安全整数/.test(ec.stderr), `边界值不该被判为数值越界：${ec.stderr.trim()}`);
@@ -797,6 +821,322 @@ test('㉝ Run 级超限时 status --json / resume 也判定不允许开新 Run',
   assertEq(r.status, 1, '超限时 resume 应非零（不得建议机械续跑）');
   assert(/非法超限/.test(r.stderr), `resume stderr 未指出非法超限：${r.stderr.trim()}`);
   assert(!/应开新 Run/.test(r.stdout), `超限时不该建议"应开新 Run"：${r.stdout.trim()}`);
+});
+
+/* ─────────── F2 机械见证：WorkSet 规模 / Worker 数 / Research pass / 子代理嵌套 ─────────── */
+
+// ㉞ F2：init 骨架的 ## Budget 恰有 8 条计数行，且 5 条带上默认上限
+test('㉞ F2 骨架 ## Budget 8 条计数行、5 条带上限', () => {
+  const dir = initDir('f2-skeleton');
+  const body = sectionBody(dir, 'Budget');
+  const lines = body.split(/\r?\n/).filter((l) => /^\s*[-*]\s+\S/.test(l));
+  assertEq(lines.length, 8, `## Budget 计数行数（实际: ${lines.join(' | ')}）`);
+  // 新 4 行 + 改造过的 已派子代理 行
+  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 0 / 8', '已派子代理 行（本次改造为带上限）');
+  assertEq(counterLine(dir, 'WorkSet 规模'), '- WorkSet 规模: 0 / 8', 'WorkSet 规模 行');
+  assertEq(counterLine(dir, 'Worker 数'), '- Worker 数: 0 / 3', 'Worker 数 行');
+  assertEq(counterLine(dir, 'Research pass'), '- Research pass: 0 / 1', 'Research pass 行');
+  assertEq(counterLine(dir, '子代理嵌套'), '- 子代理嵌套: 0 / 1', '子代理嵌套 行');
+  // 原有 4 行不被顺手改坏
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'Epoch 行');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', '完成卡数 行');
+  assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 0 / 1', '已用 Repair 行');
+  // 8 条都必须落在 ## Budget 节内（不在 Mission Budget 里）
+  assert(body.includes('WorkSet 规模: 0 / 8'), 'WorkSet 规模 不在 ## Budget 节内');
+  assert(!sectionBody(dir, 'Mission Budget').includes('WorkSet 规模'), 'WorkSet 规模 不该出现在 Mission Budget');
+  // 合法骨架 check 通过
+  assertEq(runCli(['check', dir]).status, 0, 'F2 骨架 check 退出码');
+});
+
+// ㉟ F2：四个新别名 workset / workers / research / depth 均可用并改对应行
+test('㉟ F2 四个新别名 workset/workers/research/depth 可用', () => {
+  const dir = initDir('f2-aliases');
+  assertEq(runCli(['advance', dir, 'workset']).status, 0, 'advance workset 退出码');
+  assertEq(counterLine(dir, 'WorkSet 规模'), '- WorkSet 规模: 1 / 8', 'Workset 规模 行被推进');
+  assertEq(counterLine(dir, 'Worker 数'), '- Worker 数: 0 / 3', 'workset 不该动 Worker 数');
+  assertEq(runCli(['advance', dir, 'workers']).status, 0, 'advance workers 退出码');
+  assertEq(counterLine(dir, 'Worker 数'), '- Worker 数: 1 / 3', 'Worker 数 行被推进');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', 'workset/workers 不该动 完成卡数');
+  // research / depth 默认上限是 1，推一次即触顶 → 先把上限抬到 2 再验证别名本身
+  setLimit(dir, 'Research pass', 2);
+  setLimit(dir, '子代理嵌套', 2);
+  assertEq(runCli(['advance', dir, 'research']).status, 0, 'advance research 退出码');
+  assertEq(counterLine(dir, 'Research pass'), '- Research pass: 1 / 2', 'Research pass 行被推进');
+  assertEq(runCli(['advance', dir, 'depth']).status, 0, 'advance depth 退出码');
+  assertEq(counterLine(dir, '子代理嵌套'), '- 子代理嵌套: 1 / 2', '子代理嵌套 行被推进');
+  // 旧别名 subagents 保持可用
+  assertEq(runCli(['advance', dir, 'subagents']).status, 0, 'advance subagents 退出码');
+  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 1 / 8', '已派子代理 行被推进');
+  // --help 必须列出全部别名
+  const help = runCli(['--help']);
+  assertEq(help.status, 0, '--help 退出码');
+  for (const alias of ['workset', 'workers', 'research', 'depth', 'subagents']) {
+    assert(help.stdout.includes(alias), `--help 未列出别名 ${alias}`);
+  }
+});
+
+// ㊱ F2：WorkSet 规模 8 / 8 触顶 → 任何 advance 整体拒绝且 SHA256 不变
+test('㊱ F2 WorkSet 规模触顶后任何 advance 整体拒绝且 SHA256 不变', () => {
+  const dir = initDir('f2-workset-exhausted');
+  for (let i = 1; i <= 8; i++) {
+    assertEq(runCli(['advance', dir, 'workset']).status, 0, `第 ${i} 次 advance workset 退出码`);
+  }
+  assertEq(counterLine(dir, 'WorkSet 规模'), '- WorkSet 规模: 8 / 8', 'WorkSet 规模 已触顶');
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'Epoch 仍有余量（证明是"触顶即整体拒绝"，不是"只拦自己那行"）');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', '完成卡数 仍有余量');
+
+  const denied = runCli(['gate', dir]);
+  assertEq(denied.status, 1, 'WorkSet 触顶时 gate 退出码');
+  assertEq(JSON.parse(denied.stdout).allow, false, 'WorkSet 触顶时 JSON.allow');
+  assertEq(JSON.parse(denied.stdout).run.exhausted, true, 'JSON.run.exhausted');
+  assertEq(runCli(['check', dir]).status, 1, 'WorkSet 触顶时 check 退出码');
+
+  const before = sha256(statePath(dir));
+  for (const field of ['cards', 'epoch', 'workset', 'workers', 'research', 'depth', 'subagents', 'totalcards']) {
+    const r = runCli(['advance', dir, field]);
+    assertEq(r.status, 1, `触顶后 advance ${field} 退出码`);
+    assert(/预算守卫/.test(r.stderr), `advance ${field} stderr 未提到预算守卫：${r.stderr.trim()}`);
+    assert(/WorkSet 规模/.test(r.stderr), `advance ${field} stderr 未点名 WorkSet 规模：${r.stderr.trim()}`);
+    assert(/文件未做任何修改/.test(r.stderr), `advance ${field} 未声明文件未修改：${r.stderr.trim()}`);
+    assertEq(sha256(statePath(dir)), before, `触顶后 advance ${field} 拒绝时 SHA256 不变`);
+  }
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 0 / 6', '拒绝时 Run 级不得被部分写入');
+  assertEq(counterLine(dir, '总卡数'), '- 总卡数: 0 / 12', '拒绝时 Mission 级不得被部分写入');
+});
+
+// ㊲ F2：Worker 数 3 / 3 与 已派子代理 8 / 8 触顶 → 同样整体拒绝
+test('㊲ F2 Worker 数 / 已派子代理 触顶后同样整体拒绝', () => {
+  const w = initDir('f2-workers-exhausted');
+  for (let i = 1; i <= 3; i++) {
+    assertEq(runCli(['advance', w, 'workers']).status, 0, `第 ${i} 次 advance workers 退出码`);
+  }
+  assertEq(counterLine(w, 'Worker 数'), '- Worker 数: 3 / 3', 'Worker 数 已触顶');
+  const beforeW = sha256(statePath(w));
+  const rw = runCli(['advance', w, 'cards']);
+  assertEq(rw.status, 1, 'Worker 数 触顶后 advance cards 退出码');
+  assert(/Worker 数/.test(rw.stderr), `stderr 未点名 Worker 数：${rw.stderr.trim()}`);
+  assertEq(sha256(statePath(w)), beforeW, 'Worker 数 触顶拒绝时 SHA256 不变');
+  assertEq(JSON.parse(runCli(['gate', w]).stdout).allow, false, 'Worker 数 触顶时 gate 应 DENY');
+
+  const s = initDir('f2-subagents-exhausted');
+  for (let i = 1; i <= 8; i++) {
+    assertEq(runCli(['advance', s, 'subagents']).status, 0, `第 ${i} 次 advance subagents 退出码`);
+  }
+  assertEq(counterLine(s, '已派子代理'), '- 已派子代理: 8 / 8', '已派子代理 已触顶（旧行为是无上限）');
+  const beforeS = sha256(statePath(s));
+  const rs = runCli(['advance', s, 'cards']);
+  assertEq(rs.status, 1, '已派子代理 触顶后 advance cards 退出码');
+  assert(/已派子代理/.test(rs.stderr), `stderr 未点名 已派子代理：${rs.stderr.trim()}`);
+  assertEq(sha256(statePath(s)), beforeS, '已派子代理 触顶拒绝时 SHA256 不变');
+  assertEq(JSON.parse(runCli(['gate', s]).stdout).allow, false, '已派子代理 触顶时 gate 应 DENY');
+});
+
+// ㊳ F2：Research pass 1 / 1 与 子代理嵌套 1 / 1 触顶 → 同样整体拒绝
+test('㊳ F2 Research pass / 子代理嵌套 触顶后同样整体拒绝', () => {
+  const a = initDir('f2-research-exhausted');
+  assertEq(runCli(['advance', a, 'research']).status, 0, 'advance research 退出码');
+  assertEq(counterLine(a, 'Research pass'), '- Research pass: 1 / 1', 'Research pass 已触顶');
+  const beforeA = sha256(statePath(a));
+  const ra = runCli(['advance', a, 'depth']);
+  assertEq(ra.status, 1, 'Research pass 触顶后 advance depth 退出码');
+  assert(/Research pass/.test(ra.stderr), `stderr 未点名 Research pass：${ra.stderr.trim()}`);
+  assertEq(sha256(statePath(a)), beforeA, 'Research pass 触顶拒绝时 SHA256 不变');
+  assertEq(JSON.parse(runCli(['gate', a]).stdout).allow, false, 'Research pass 触顶时 gate 应 DENY');
+
+  const b = initDir('f2-depth-exhausted');
+  assertEq(runCli(['advance', b, 'depth']).status, 0, 'advance depth 退出码');
+  assertEq(counterLine(b, '子代理嵌套'), '- 子代理嵌套: 1 / 1', '子代理嵌套 已触顶');
+  const beforeB = sha256(statePath(b));
+  const rb = runCli(['advance', b, 'research']);
+  assertEq(rb.status, 1, '子代理嵌套 触顶后 advance research 退出码');
+  assert(/子代理嵌套/.test(rb.stderr), `stderr 未点名 子代理嵌套：${rb.stderr.trim()}`);
+  assertEq(sha256(statePath(b)), beforeB, '子代理嵌套 触顶拒绝时 SHA256 不变');
+  assertEq(JSON.parse(runCli(['gate', b]).stdout).allow, false, '子代理嵌套 触顶时 gate 应 DENY');
+});
+
+// ㊴ F2 向后兼容：缺新行的旧文件 → check exit 0 + 警告（列出缺失项），advance/gate 行为不变
+test('㊴ F2 向后兼容：缺新行的旧文件 check exit 0 + 警告且 advance 可用', () => {
+  const dir = initDir('f2-legacy-budget');
+  // 还原成 v0.5.x 旧文件：删掉 4 条新行 + 把 已派子代理 写回无上限旧写法
+  deleteLine(dir, '- WorkSet 规模: 0 / 8');
+  deleteLine(dir, '- Worker 数: 0 / 3');
+  deleteLine(dir, '- Research pass: 0 / 1');
+  deleteLine(dir, '- 子代理嵌套: 0 / 1');
+  replaceLine(dir, '- 已派子代理: 0 / 8', '- 已派子代理: 0');
+  assert(!readState(dir).includes('WorkSet 规模'), '构造旧文件失败（WorkSet 规模 仍在）');
+
+  const c = runCli(['check', dir]);
+  assertEq(c.status, 0, '旧文件 check 退出码（缺失只警告，必须为 0）');
+  assert(/缺少机械见证计数行/.test(c.stderr), `check 未给出缺失警告：${c.stderr.trim()}`);
+  for (const label of ['WorkSet 规模', 'Worker 数', 'Research pass', '子代理嵌套']) {
+    assert(c.stderr.includes(label), `check 警告未列出缺失项 ${label}：${c.stderr.trim()}`);
+  }
+  assert(/已派子代理/.test(c.stderr) && /未写上限/.test(c.stderr), `check 未警告 已派子代理 无上限：${c.stderr.trim()}`);
+  assert(!/^runstate: 错误/m.test(c.stderr), `旧文件 check 不该报错误：${c.stderr.trim()}`);
+
+  // advance 行为不变：原有字段照常推进（并带同样的兼容警告）
+  const a = runCli(['advance', dir, 'cards']);
+  assertEq(a.status, 0, '旧文件 advance cards 退出码');
+  assertEq(counterLine(dir, '完成卡数'), '- 完成卡数: 1 / 6', '旧文件 Run 级照常递增');
+  assertEq(counterLine(dir, '总卡数'), '- 总卡数: 1 / 12', '旧文件 Mission 级照常递增');
+  // gate 行为不变：预算未触顶 → allow:true
+  const g = runCli(['gate', dir]);
+  assertEq(g.status, 0, '旧文件 gate 退出码');
+  assertEq(JSON.parse(g.stdout).allow, true, '旧文件 JSON.allow');
+  // 新别名在旧文件上没有对应行 → 明确 exit 1（不得静默 exit 0），且文件不变
+  const before = sha256(statePath(dir));
+  const missing = runCli(['advance', dir, 'workset']);
+  assertEq(missing.status, 1, '旧文件缺 WorkSet 规模 行时 advance workset 退出码');
+  assert(/WorkSet 规模/.test(missing.stderr), `stderr 未点名缺失的 WorkSet 规模：${missing.stderr.trim()}`);
+  assertEq(sha256(statePath(dir)), before, '缺行时 advance 拒绝后 SHA256 不变');
+});
+
+// ㊵ F2：gate 在 WorkSet 规模触顶时 DENY（allow:false / exit 1 / reason 点名）
+test('㊵ F2 gate 在 WorkSet 触顶时 DENY', () => {
+  const dir = initDir('f2-gate-workset');
+  for (let i = 1; i <= 8; i++) {
+    assertEq(runCli(['advance', dir, 'workset']).status, 0, `第 ${i} 次 advance workset`);
+  }
+  const r = runCli(['gate', dir]);
+  assertEq(r.status, 1, 'WorkSet 触顶时 gate 退出码');
+  const parsed = JSON.parse(r.stdout);
+  assertEq(parsed.allow, false, 'gate JSON.allow');
+  assert(/WorkSet 规模/.test(parsed.reason), `gate reason 未点名 WorkSet 规模：${parsed.reason}`);
+  assertEq(parsed.run.exhausted, true, 'gate JSON.run.exhausted');
+  assertEq(parsed.mission.exhausted, false, 'gate JSON.mission.exhausted（Mission 仍有余量）');
+  // status 仍 exit 0（允许/拒绝的判断只认 gate）
+  assertEq(runCli(['status', dir, '--json']).status, 0, 'status --json 退出码');
+  assertEq(JSON.parse(runCli(['status', dir, '--json']).stdout).exhausted, true, 'status JSON.exhausted');
+});
+
+// ㊶ F2：new-run 把 Run 级 8 项全部归零；旧文件缺新行时跳过缺失项仍可用
+test('㊶ F2 new-run 重置 Run 级 8 项，旧文件缺新行时仍可用', () => {
+  const dir = initDir('f2-new-run-8');
+  // Research pass / 子代理嵌套 默认上限都是 1，先各自抬到 2，才能把 8 项同时推成非零
+  setLimit(dir, 'Research pass', 2);
+  setLimit(dir, '子代理嵌套', 2);
+  for (const field of ['epoch', 'cards', 'workset', 'workers', 'subagents', 'depth', 'research']) {
+    assertEq(runCli(['advance', dir, field]).status, 0, `advance ${field} 退出码`);
+  }
+  // 再把 Research pass 推到 2 / 2 触顶：Run 级耗尽时 new-run 仍必须可机械续跑
+  assertEq(runCli(['advance', dir, 'research']).status, 0, 'advance research #2 退出码');
+  assertEq(counterLine(dir, 'Research pass'), '- Research pass: 2 / 2', 'Research pass 恰好耗尽');
+  assertEq(runCli(['gate', dir]).status, 1, '耗尽后 gate 应 DENY');
+
+  const n = runCli(['new-run', dir]);
+  assertEq(n.status, 0, 'new-run 退出码（Run 级耗尽必须可机械续跑）');
+  assertEq(counterLine(dir, 'Epoch'), '- Epoch: 0 / 2', 'new-run 后 Epoch');
+  assertEq(counterLine(dir, '已用 Repair'), '- 已用 Repair: 0 / 1', 'new-run 后 已用 Repair');
+  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 0 / 8', 'new-run 后 已派子代理');
+  assertEq(counterLine(dir, 'WorkSet 规模'), '- WorkSet 规模: 0 / 8', 'new-run 后 WorkSet 规模');
+  assertEq(counterLine(dir, 'Worker 数'), '- Worker 数: 0 / 3', 'new-run 后 Worker 数');
+  // 只归零、不改上限：本用例把两个上限抬到了 2，重置后上限仍是 2
+  assertEq(counterLine(dir, 'Research pass'), '- Research pass: 0 / 2', 'new-run 后 Research pass（上限保持 2）');
+  assertEq(counterLine(dir, '子代理嵌套'), '- 子代理嵌套: 0 / 2', 'new-run 后 子代理嵌套（上限保持 2）');
+  assert(/已重置 Run 级 8 项/.test(n.stdout), `stdout 未说明重置 8 项：${n.stdout.trim()}`);
+  assertEq(runCli(['gate', dir]).status, 0, 'new-run 后 gate 应恢复 ALLOW');
+  // Mission 级记忆不被重置
+  assertEq(counterLine(dir, 'Run'), '- Run: 1 / 3', 'new-run 后 Mission Run +1');
+  assertEq(counterLine(dir, '总卡数'), '- 总卡数: 1 / 12', 'Mission 记忆不该被重置');
+
+  // 旧文件缺 4 条新行 → new-run 仍 exit 0，只重置存在的 4 项并说明跳过
+  const legacy = initDir('f2-new-run-legacy');
+  deleteLine(legacy, '- WorkSet 规模: 0 / 8');
+  deleteLine(legacy, '- Worker 数: 0 / 3');
+  deleteLine(legacy, '- Research pass: 0 / 1');
+  deleteLine(legacy, '- 子代理嵌套: 0 / 1');
+  assertEq(runCli(['advance', legacy, 'cards']).status, 0, '旧文件 advance cards');
+  const nl = runCli(['new-run', legacy]);
+  assertEq(nl.status, 0, '旧文件 new-run 退出码');
+  assertEq(counterLine(legacy, '完成卡数'), '- 完成卡数: 0 / 6', '旧文件 new-run 仍重置必需项');
+  assert(/已重置 Run 级 4 项/.test(nl.stdout), `stdout 未说明只重置 4 项：${nl.stdout.trim()}`);
+  assert(/跳过旧文件缺失的 Run 级计数行/.test(nl.stdout), `stdout 未说明跳过缺失行：${nl.stdout.trim()}`);
+});
+
+// ㊷ F2：文档与 CLI 标签逐字一致（8 个标签 + 4 个新别名），防止文档再次跑偏
+test('㊷ F2 中英文档与 CLI 标签逐字一致（8 标签 + 4 别名）', () => {
+  const labels = [
+    'Epoch',
+    '完成卡数',
+    '已用 Repair',
+    '已派子代理',
+    'WorkSet 规模',
+    'Worker 数',
+    'Research pass',
+    '子代理嵌套',
+  ];
+  const aliases = ['subagents', 'workset', 'workers', 'research', 'depth'];
+  // 四类文档 × 中英：SKILL.md / production-control / framework / run-state-template
+  const docs = [
+    'skills/personal-dev-workflow/SKILL.md',
+    'skills/personal-dev-workflow-zh/SKILL.md',
+    'skills/personal-dev-workflow/references/production-control.md',
+    'skills/personal-dev-workflow-zh/references/production-control.md',
+    'skills/personal-dev-workflow/references/framework.md',
+    'skills/personal-dev-workflow-zh/references/framework.md',
+    'skills/personal-dev-workflow/references/run-state-template.md',
+    'skills/personal-dev-workflow-zh/references/run-state-template.md',
+  ];
+  for (const rel of docs) {
+    const file = path.join(PROJECT_ROOT, rel);
+    assert(fs.existsSync(file), `文档缺失: ${rel}`);
+    const text = fs.readFileSync(file, 'utf8');
+    for (const label of labels) {
+      assert(text.includes(label), `${rel} 未提到 CLI 标签 "${label}"（文档与 CLI 已跑偏）`);
+    }
+    if (rel.includes('production-control')) {
+      for (const alias of aliases) {
+        assert(text.includes(alias), `${rel} 未提到 advance 别名 "${alias}"`);
+      }
+    }
+  }
+  // 示例状态文件（run-state-template.md）：## Budget 节必须是 8 条 "x / y" 带上限的计数行，
+  // 且示例值自洽（不得出现超过上限的示例值）——否则用户照抄就会生成"无见证"的状态文件。
+  for (const rel of docs.filter((d) => d.includes('run-state-template'))) {
+    const text = fs.readFileSync(path.join(PROJECT_ROOT, rel), 'utf8');
+    const body = [];
+    let inside = false;
+    for (const line of text.split(/\r?\n/)) {
+      const heading = /^##\s+(.*\S)\s*$/.exec(line);
+      if (heading) {
+        inside = heading[1].split(/[（(]/)[0].trim().toLowerCase() === 'budget';
+        continue;
+      }
+      if (inside) body.push(line);
+    }
+    const counters = body.filter((l) => /^\s*[-*]\s+\S/.test(l));
+    assertEq(counters.length, 8, `${rel} 的 ## Budget 示例计数行数`);
+    for (const line of counters) {
+      const m = /^\s*[-*]\s+([^:：]+)[:：]\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(line);
+      assert(m !== null, `${rel} 的示例计数行不是 "标签: 当前 / 上限" 写法: "${line.trim()}"`);
+      assert(
+        Number(m[2]) <= Number(m[3]),
+        `${rel} 的示例值超过上限: "${line.trim()}"`,
+      );
+    }
+  }
+  // 生产控制文档里的默认值与 init 骨架必须一致（逐条对照上限）
+  const zh = fs.readFileSync(path.join(PROJECT_ROOT, docs[3]), 'utf8');
+  for (const [label, limit] of [
+    ['已派子代理', 8],
+    ['WorkSet 规模', 8],
+    ['Worker 数', 3],
+    ['Research pass', 1],
+    ['子代理嵌套', 1],
+  ]) {
+    assert(
+      new RegExp(`\`${label}\`[^|]*\\|\\s*≤\\s*${limit}`).test(zh) ||
+        new RegExp(`\`${label}\`[^|]*≤ ${limit}`).test(zh),
+      `zh production-control.md 里 "${label}" 的默认上限不是 ${limit}`,
+    );
+  }
+  // CLI 侧同源：骨架确实写的就是这些上限（用例 ㉞ 已逐行断言，这里做一次交叉核对）
+  const dir = initDir('f2-doc-crosscheck');
+  assertEq(counterLine(dir, '已派子代理'), '- 已派子代理: 0 / 8', 'CLI 骨架 已派子代理 上限');
+  assertEq(counterLine(dir, 'WorkSet 规模'), '- WorkSet 规模: 0 / 8', 'CLI 骨架 WorkSet 规模 上限');
+  assertEq(counterLine(dir, 'Worker 数'), '- Worker 数: 0 / 3', 'CLI 骨架 Worker 数 上限');
+  assertEq(counterLine(dir, 'Research pass'), '- Research pass: 0 / 1', 'CLI 骨架 Research pass 上限');
+  assertEq(counterLine(dir, '子代理嵌套'), '- 子代理嵌套: 0 / 1', 'CLI 骨架 子代理嵌套 上限');
 });
 
 /* ──────────────────────────────── 运行器 ──────────────────────────────── */

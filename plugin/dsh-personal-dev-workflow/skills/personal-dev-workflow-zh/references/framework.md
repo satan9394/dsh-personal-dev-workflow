@@ -58,7 +58,7 @@ Harness 管 agent 单次运行的武装：给哪些工具、允许哪些动作�
 - OpenAI 关于委派的指引同理：低风险、可重复的工作交出去；模糊设计与高风险改动留给人。因此本 skill 是"**默认自动验收，例外才升级**"。
 - 审计/发现被刻意做成**没有执行权的独立模式**：只产出发现、写进 backlog，然后停止。Backlog 是记忆，不是队列。
 - 默认预算是**两级**的——两级都是 `RUN_STATE.md` 里的计数器，且文件里实际写的上限优先于这里的默认值：
-  - **Run 预算 —— `## Budget`**（管单次运行的上下文卫生）：Epoch ≤ 2 · 每 Epoch 完成卡 ≤ 6 · WorkSet ≤ 8 · Worker 2（上限 3）· 单卡 Repair ≤ 1 · Research pass ≤ 1 · 子代理嵌套 ≤ 1。
+  - **Run 预算 —— `## Budget`**（管单次运行的上下文卫生；8 条计数行，标签与 `init` 骨架、`advance` 别名逐字对齐）：`Epoch` ≤ 2 · `完成卡数` ≤ 6 · `已用 Repair` ≤ 1 · `已派子代理` ≤ 8 · `WorkSet 规模` ≤ 8 · `Worker 数` ≤ 3 · `Research pass` ≤ 1 · `子代理嵌套` ≤ 1。
   - **Mission 预算 —— `## Mission Budget`**（管整个 Mission 跨 Run 的熔断；`new-run` 永不重置）：Run ≤ 3 · 总卡数 ≤ 12 · 总 Repair ≤ 3。
   - **谁来处理耗尽**：**Run** 预算耗尽由 agent 自己处理——先写状态文件，再 `node tools/runstate.js new-run` 换新上下文续跑，不找人；只有 **Mission** 预算耗尽才升级给人。
 - 把它们编号，是为了把"注意节约"变成一个可检查的数字，而不是一句可以被忽略的态度。预算用尽（Run 换新 Run、Mission 停止升级）是正常结果，不是失败。

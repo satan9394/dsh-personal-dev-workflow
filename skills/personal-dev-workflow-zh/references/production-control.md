@@ -51,14 +51,22 @@ Agent 可以在 WorkSet **内部**重排、拆分、丢弃卡片，但**不得�
 
 **Run 预算 —— `## Budget`。** 用途：防上下文污染、防 Token 膨胀、防单会话过长。它是**运行卫生**限制，不是范围限制。
 
+`init` 骨架给出下面 **8 条计数行**，标签与 `runstate.js` 的 `advance` 字段别名逐字对应；上限以文件里实际写的为准。
+
 | 计数器（`RUN_STATE.md` 里的标签） | 默认 | 说明 |
 |---|---|---|
 | `Epoch` | ≤ 2 | 一个 Epoch = 一轮调度 + 执行 |
 | `完成卡数` | ≤ 6 | 超额说明这个 Run 的范围划得太大 |
 | `已用 Repair` | ≤ 1 | 第二次失败即 `BLOCKED` |
-| `已派子代理` | 无上限 | 仍受 Worker 2（上限 3）、子代理嵌套深度 1、Evaluator 1、Research pass 1 约束 |
+| `已派子代理` | ≤ 8 | 每次派子代理 `advance <dir> subagents`；仍受 `Worker 数`、`子代理嵌套` 约束 |
+| `WorkSet 规模` | ≤ 8 | 本 Run 物化的卡数（blocker 只能替换、不得撑大）；别名 `workset` |
+| `Worker 数` | ≤ 3 | 并行 Worker 上限（默认 2、上限 3）；别名 `workers` |
+| `Research pass` | ≤ 1 | 每 Run 最多一次调研轮；别名 `research` |
+| `子代理嵌套` | ≤ 1 | 子代理只允许一层；别名 `depth` |
 
-**Run 预算耗尽 → 机械续跑，不找人：** 写 `RUN_STATE.md` → 跑 `node tools/runstate.js new-run <项目根>`。它把 Run 级四项归零、Mission 级 `Run` +1，然后在**新上下文**里继续。不要问人，也不要赖在旧上下文里硬扛。
+旧版 `RUN_STATE.md`（v0.5.1 及更早）没有后 4 条行，或把 `已派子代理` / `Worker 数` 写成无上限旧写法（如 `- Worker 数: 2（上限 3）`，那个"上限 3"只是备注）：`check` 仍 **exit 0**，只给警告并列出缺失项；`advance` / `new-run` / `gate` 行为不变。补上这些行即可获得对应硬上限。
+
+**Run 预算耗尽 → 机械续跑，不找人：** 写 `RUN_STATE.md` → 跑 `node tools/runstate.js new-run <项目根>`。它把 Run 级 **8 项**计数器全部归零（旧文件缺的行跳过）、Mission 级 `Run` +1，然后在**新上下文**里继续。不要问人，也不要赖在旧上下文里硬扛。
 
 **Mission 预算 —— `## Mission Budget`。** 用途：整个 Mission 的总保险丝，跨所有 Run 生效；`new-run` 永不重置它。
 
@@ -79,13 +87,13 @@ Agent 可以在 WorkSet **内部**重排、拆分、丢弃卡片，但**不得�
 | 子命令 | 何时用 / 做什么 |
 |---|---|
 | `gate <项目根>` | **每次派活之前**。`{"allow":true}` 且 exit 0 才授权派活；exit 1（`{"allow":false,"reason":…}`）→ 停止、checkpoint、不派。在 DSH 上，host 闸门（`n3-budget-gate`）会在 `subagent` / `subagent_fork` / `workflow` / `ralph` 派发前自动跑这条同样的命令 —— 见 §10 |
-| `advance <dir> <field>` | 边干边计数。Run 字段：`epoch` / `cards` / `repairs` / `subagents`；Mission 字段：`runs` / `totalcards` / `totalrepairs`。`cards` 与 `repairs` 同时递增两级 |
+| `advance <dir> <field>` | 边干边计数。Run 字段（8 个）：`epoch` / `cards` / `repairs` / `subagents` / `workset` / `workers` / `research` / `depth`；Mission 字段（3 个）：`runs` / `totalcards` / `totalrepairs`。`cards` 与 `repairs` 同时递增两级；任一有限额计数器触顶 → 任何 `advance` 都整体拒绝且文件字节不变 |
 | `status <dir> [--json]` | 两级预算摘要；`--json` 供机器读取（含 `exhausted`、`allowNewRun`、各级计数器）。触顶时它的退出码仍是 0 —— 允许/拒绝的判断用 `gate` |
 | `resume <dir>` | 打印恢复计划（Resume From + 下一步 + 是否还允许开新 Run）；只有 Mission 预算耗尽才 exit 1 |
 | `new-run <dir>` | 开新 Run（Run 级归零、Mission 级 `Run` +1）；只有 Mission 级 `Run` 触顶才拒绝（exit 1） |
 | `check <dir>` / `init <dir>` | 严格校验（计数行格式非法即报错并指行号）/ 生成 12 节 `RUN_STATE.md` 骨架 |
 
-退出码：`0` 成功 · `1` 状态/校验/预算错误（含 `gate` 拒绝）· `2` 用法错误。旧文件缺 `## Mission Budget` 节 → 按「无上限 + 警告」处理（向后兼容），不算错误。
+退出码：`0` 成功 · `1` 状态/校验/预算错误（含 `gate` 拒绝）· `2` 用法错误。旧文件缺 `## Mission Budget` 节 → 按「无上限 + 警告」处理（向后兼容），不算错误；旧文件缺 `WorkSet 规模` / `Worker 数` / `Research pass` / `子代理嵌套` 行（或这些行没写上限）→ 同样只警告、不算错误（只有"标签存在而值非法/重复"才判错）。
 
 ## 6. 停止条件 —— 先写 `RUN_STATE.md`，然后停止
 

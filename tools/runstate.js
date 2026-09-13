@@ -10,7 +10,7 @@
  *   - `advance` 支持 mission 级别名（runs / totalcards / totalrepairs）；
  *     `cards` / `repairs` 同时递增两级，任一级触顶即整体拒绝（原子：文件字节不变）。
  *   - `status`（两级预算摘要，--json 机器可读）、`resume`（恢复计划）、`gate`（机器闸门 JSON）。
- *   - `new-run`（开新 Run）：Run 级四项计数归零、Mission 级 `Run` +1；Mission `Run` 触顶则拒绝
+ *   - `new-run`（开新 Run）：Run 级 8 项计数归零、Mission 级 `Run` +1；Mission `Run` 触顶则拒绝
  *     （退出 1、文件字节不变）。**仅 Run 预算耗尽时走这条路，不需要人工确认**；
  *     只有 Mission 预算耗尽才升级给人。
  *   - 向后兼容：旧文件缺 `## Mission Budget` 节时按「无上限 + 警告」处理。
@@ -25,6 +25,23 @@
  *   - `new-run` 的合法例外被精确区分：Run 级 `current == limit`（正常耗尽）→ **允许**；
  *     Run 级 `current > limit`（手工超限，如 99/6）→ **拒绝**，防洗白（P1-5）；
  *     Mission 级任一 `current >= limit` → **拒绝**并升级给人，且不得烧 Run 配额（P1-6）。
+ *
+ * v4（F2：给文档承诺的 Run 级上限装上机械见证）：
+ *   - Run 级计数器由 4 条增为 8 条：新增 `WorkSet 规模`、`Worker 数`、`Research pass`、`子代理嵌套`，
+ *     并把 `已派子代理` 从「无上限」改造为带上限
+ *     （模板 8 行：`- Epoch: 0 / 2`、`- 完成卡数: 0 / 6`、`- 已用 Repair: 0 / 1`、
+ *      `- 已派子代理: 0 / 8`、`- WorkSet 规模: 0 / 8`、`- Worker 数: 0 / 3`、
+ *      `- Research pass: 0 / 1`、`- 子代理嵌套: 0 / 1`）。
+ *   - `advance` 新增别名 `workset` / `workers` / `research` / `depth`（`subagents` 保持）；
+ *     四者都只递增 Run 级对应行。
+ *   - 上述 5 条上限自动纳入 F1 的整文件校验 + 触顶整体拒绝语义（任一触顶 → 任何 advance 都
+ *     exit 1、文件字节不变；`gate` 也据此 DENY），因此文档里 `WorkSet 规模 ≤ 8` /
+ *     `Worker 数 ≤ 3` / `已派子代理 ≤ 8` / `Research pass ≤ 1` / `子代理嵌套 ≤ 1` 有硬见证。
+ *   - 向后兼容（必须）：旧版 RUN_STATE.md 缺这 4 条新行、或其中任一行写成「无上限」旧写法
+ *     （如 `- Worker 数: 2（上限 3）`，那个"上限 3"只是备注）→ `check` 仍 exit 0，只给**警告**
+ *     并列出缺失项；`advance` / `new-run` / `gate` 行为不变。
+ *     只有"该标签存在但值非法/重复"才判状态错误。
+ *   - `new-run` 把 Run 级**8 项**全部归零（旧文件缺新行时跳过缺失项，不算错误）。
  *
  * 只使用 node:fs / node:path / process，无任何 npm 依赖；CommonJS（仓库根 package.json 为 "type": "commonjs"）。
  *
@@ -83,7 +100,7 @@ const USAGE = `runstate — 零依赖 RUN_STATE.md 状态机 CLI（Run / Mission
   node runstate.js check <dir>          严格校验必需节 + 两级预算（计数行格式非法即报错）
   node runstate.js advance <dir> <field>
                                         推进计数器；任一级触顶即拒绝且文件字节不变
-  node runstate.js new-run <dir>        开新 Run：Run 级四项归零 + Mission 级 Run +1
+  node runstate.js new-run <dir>        开新 Run：Run 级 8 项归零 + Mission 级 Run +1
                                         （Mission Run 触顶则拒绝、exit 1、文件字节不变）
   node runstate.js status <dir> [--json]
                                         打印两级预算摘要（--json 输出机器可读 JSON）
@@ -91,21 +108,35 @@ const USAGE = `runstate — 零依赖 RUN_STATE.md 状态机 CLI（Run / Mission
   node runstate.js gate <dir>           机器闸门：stdout 打印 JSON {"allow":…,"reason":…,"run":…,"mission":…}
 
 两级预算:
-  Run 级（## ${RUN_SECTION}）        Epoch / 完成卡数 / 已用 Repair / 已派子代理
+  Run 级（## ${RUN_SECTION}）        Epoch / 完成卡数 / 已用 Repair / 已派子代理 /
+                                  WorkSet 规模 / Worker 数 / Research pass / 子代理嵌套
   Mission 级（## ${MISSION_SECTION}）Run / 总卡数 / 总 Repair
   旧版文件缺少 ## ${MISSION_SECTION} 节时按「无上限 + 警告」处理（向后兼容）。
 
+五条被文档承诺的 Run 级上限（本 CLI 的机械见证）:
+  已派子代理 ≤ 8 · WorkSet 规模 ≤ 8 · Worker 数 ≤ 3 · Research pass ≤ 1 · 子代理嵌套 ≤ 1
+  （默认值写在 init 骨架里，以文件实际写的上限为准）。
+  旧版 RUN_STATE.md 缺 WorkSet 规模 / Worker 数 / Research pass / 子代理嵌套 行，
+  或任一行写成无上限旧写法（如 "- Worker 数: 2（上限 3）"，那个"上限 3"只是备注）
+  → check 仍 exit 0，只给警告并列出缺失项（向后兼容）；advance / new-run / gate 行为不变。
+
 advance 字段别名（大小写不敏感）:
   run 级  epoch（Epoch） / cards（完成卡数） / repairs（已用 Repair） / subagents（已派子代理）
+          / workset（WorkSet 规模） / workers（Worker 数）
+          / research（Research pass） / depth（子代理嵌套）
   mission 级  runs（Run） / totalcards（总卡数） / totalrepairs（总 Repair）
 
   组合语义:
     cards      → Run 级「完成卡数」与 Mission 级「总卡数」各 +1
     repairs    → Run 级「已用 Repair」与 Mission 级「总 Repair」各 +1
     epoch      → 只递增 Run 级「Epoch」
-    subagents  → 只递增 Run 级「已派子代理」（模板中无上限）
+    subagents  → 只递增 Run 级「已派子代理」（模板上限 8）
+    workset    → 只递增 Run 级「WorkSet 规模」（上限 8）
+    workers    → 只递增 Run 级「Worker 数」（上限 3）
+    research   → 只递增 Run 级「Research pass」（上限 1）
+    depth      → 只递增 Run 级「子代理嵌套」（上限 1）
     runs / totalcards / totalrepairs → 只递增对应的 Mission 级计数器
-  任一级的上限会被突破（当前 + 1 > 上限）→ 整体拒绝、退出 1、文件字节不变。
+  任一级任一有限额计数器触顶（当前 >= 上限）→ 任何 advance 都整体拒绝、退出 1、文件字节不变。
 
 写盘纪律（advance / new-run 共用，整文件校验）:
   两个写命令在写盘之前都会对整份 RUN_STATE.md 做一次完整校验；只要满足以下任一条，
@@ -114,11 +145,14 @@ advance 字段别名（大小写不敏感）:
     2) 任一有限额计数器 current >= limit（任一级耗尽即整体拒绝）。
   必需计数行: Run 级 4 项（Epoch / 完成卡数 / 已用 Repair / 已派子代理）、
               Mission 级 3 项（Run / 总卡数 / 总 Repair）；
+  旧版兼容（只警告、不判错）: Run 级的 WorkSet 规模 / Worker 数 / Research pass / 子代理嵌套
+              缺失，或"见证行"存在却没写 / 上限（旧写法）；
   "节存在而计数行不全" = 状态错误；整个 ## Mission Budget 节缺失 = 向后兼容豁免（带警告）。
   数值越界: 任一计数值或上限 > Number.MAX_SAFE_INTEGER（9007199254740991）→ 状态错误。
 
 new-run 语义（Run 边界：机械续跑，不找人）:
-  把 Run 级计数器（Epoch / 完成卡数 / 已用 Repair / 已派子代理）重置为 0；
+  把 Run 级计数器（Epoch / 完成卡数 / 已用 Repair / 已派子代理 / WorkSet 规模 / Worker 数 /
+  Research pass / 子代理嵌套）全部重置为 0；
   把 Mission 级「Run」+1（新 Run 编号 = 递增后的 Mission Run 当前值）；
   Mission 级总量（总卡数 / 总 Repair）是记忆，不重置。
   适用场景: Run 预算耗尽而 Mission 仍有余额 → 在新上下文里续跑，无需人工确认。
@@ -129,6 +163,7 @@ new-run 语义（Run 边界：机械续跑，不找人）:
   合法例外: Run 级任一计数器 current == limit（正常耗尽）→ **允许** new-run，
             这正是 new-run 存在的理由（把耗尽的 Run 归零），不得误杀。
   旧版文件缺 ## Mission Budget 节 → 按「无上限 + 警告」处理：仍重置 Run 级，跳过 Mission Run 递增。
+  旧版文件缺 WorkSet 规模 / Worker 数 / Research pass / 子代理嵌套 行 → 跳过这些缺失项（向后兼容）。
 
 退出码:
   0  成功
@@ -182,7 +217,11 @@ development
 - Epoch: 0 / 2
 - 完成卡数: 0 / 6
 - 已用 Repair: 0 / 1
-- 已派子代理: 0
+- 已派子代理: 0 / 8
+- WorkSet 规模: 0 / 8
+- Worker 数: 0 / 3
+- Research pass: 0 / 1
+- 子代理嵌套: 0 / 1
 
 ## Mission Budget
 - Run: 0 / 3
@@ -248,6 +287,10 @@ const RUN_ALIASES = new Map([
   ['cards', '完成卡数'],
   ['repairs', '已用 Repair'],
   ['subagents', '已派子代理'],
+  ['workset', 'WorkSet 规模'],
+  ['workers', 'Worker 数'],
+  ['research', 'Research pass'],
+  ['depth', '子代理嵌套'],
 ]);
 
 const MISSION_ALIASES = new Map([
@@ -265,6 +308,10 @@ const ADVANCE_PLAN = new Map([
   ['cards', [{ level: 'run', label: '完成卡数' }, { level: 'mission', label: '总卡数' }]],
   ['repairs', [{ level: 'run', label: '已用 Repair' }, { level: 'mission', label: '总 Repair' }]],
   ['subagents', [{ level: 'run', label: '已派子代理' }]],
+  ['workset', [{ level: 'run', label: 'WorkSet 规模' }]],
+  ['workers', [{ level: 'run', label: 'Worker 数' }]],
+  ['research', [{ level: 'run', label: 'Research pass' }]],
+  ['depth', [{ level: 'run', label: '子代理嵌套' }]],
   ['runs', [{ level: 'mission', label: 'Run' }]],
   ['totalcards', [{ level: 'mission', label: '总卡数' }]],
   ['totalrepairs', [{ level: 'mission', label: '总 Repair' }]],
@@ -288,10 +335,38 @@ const RUN_REQUIRED_LABELS = ['Epoch', '完成卡数', '已用 Repair', '已派�
 const MISSION_REQUIRED_LABELS = ['Run', '总卡数', '总 Repair'];
 
 /**
- * new-run 重置的 Run 级计数器标签（= Run 级必需项，模板顺序一致）。
- * Mission 级「Run」由 new-run 单独 +1；Mission 级总量（总卡数 / 总 Repair）不在此列表，保留为记忆。
+ * F2 机械见证行（旧版 RUN_STATE.md 可能一条都没有）。
+ *
+ * 这 4 条把文档里"有承诺、没见证"的上限变成可机械检查的计数行：
+ *   WorkSet 规模 ≤ 8 · Worker 数 ≤ 3 · Research pass ≤ 1 · 子代理嵌套 ≤ 1
+ * （另外 `已派子代理` 由"无上限"改造成 `0 / 8`，见 RUN_WITNESS_DEFAULTS。）
+ *
+ * 向后兼容语义（任务卡 F2 第 4 条）：`## Budget` 节存在但这些行缺失 → **只警告、不判错**；
+ * 只有"标签存在而值非法 / 同一节内重复"才进 errors。顺序 = 模板顺序。
  */
-const NEW_RUN_RESET_LABELS = RUN_REQUIRED_LABELS;
+const RUN_WITNESS_LABELS = ['WorkSet 规模', 'Worker 数', 'Research pass', '子代理嵌套'];
+
+/**
+ * 带默认上限的 Run 级计数行（键为小写标签）→ 默认上限。
+ * 只用于两种情况：
+ *   1) 警告文案里"建议补上 / 建议写成 <当前值> / <默认上限>"的提示；
+ *   2) 识别旧写法（该行存在但没写 `/ 上限`，例如 `- Worker 数: 2（上限 3）`）→ 仍然只警告。
+ * 判定"触顶"一律以**文件里实际写的上限**为准，不拿这里的默认值去卡旧文件。
+ */
+const RUN_WITNESS_DEFAULTS = new Map([
+  ['已派子代理', 8],
+  ['workset 规模', 8],
+  ['worker 数', 3],
+  ['research pass', 1],
+  ['子代理嵌套', 1],
+]);
+
+/**
+ * new-run 重置的 Run 级计数器标签（= Run 级 8 项，模板顺序一致）。
+ * Mission 级「Run」由 new-run 单独 +1；Mission 级总量（总卡数 / 总 Repair）不在此列表，保留为记忆。
+ * 旧文件缺 RUN_WITNESS_LABELS 里的行时跳过（向后兼容），不算错误。
+ */
+const NEW_RUN_RESET_LABELS = [...RUN_REQUIRED_LABELS, ...RUN_WITNESS_LABELS];
 
 /** 按「含行尾符」切行：未改动的行原样拼接回去，保证字节级不变。 */
 function splitLines(text) {
@@ -530,6 +605,33 @@ function analyzeLevels(text) {
           `## ${level.section} 节缺少必需计数行: ${missing.join(' / ')}` +
             `（该节现有 ${level.lines.length} 条计数行，必需 ${required.length} 项）`,
         );
+      }
+
+      // F2 向后兼容（任务卡第 4 条）：Run 级 4 条"机械见证"行缺失 → **只警告、不判错**。
+      // 旧版 RUN_STATE.md（v0.5.x 及更早）本来就没有这几行；报错会让所有旧状态文件立刻失效。
+      if (level.name !== 'mission') {
+        const absent = RUN_WITNESS_LABELS.filter((label) => !presentLabels.has(label.toLowerCase()));
+        if (absent.length > 0) {
+          const detail = absent
+            .map((label) => `${label} ≤ ${RUN_WITNESS_DEFAULTS.get(label.toLowerCase())}`)
+            .join(' / ');
+          warnings.push(
+            `## ${level.section} 缺少机械见证计数行: ${absent.join(' / ')}` +
+              `（旧版 RUN_STATE.md 未含这些上限，向后兼容：按「无上限 + 警告」处理，不算错误）；` +
+              `建议补上以启用 ${detail} 的硬上限`,
+          );
+        }
+        // 旧写法容忍：行存在但没写 "/ 上限"（如 `- Worker 数: 2（上限 3）` 的"上限 3"只是备注）
+        // → 只警告，不判错，也**不**拿默认值去卡它（以文件实际写的上限为准）。
+        for (const line of level.lines) {
+          if (!line.parsed || line.limit !== null) continue;
+          const fallback = RUN_WITNESS_DEFAULTS.get(line.label.toLowerCase());
+          if (fallback === undefined) continue;
+          warnings.push(
+            `## ${level.section} 计数行「${line.label}」未写上限（旧写法，向后兼容：按无上限容忍，不算错误）；` +
+              `建议写成 "- ${line.label}: ${line.current} / ${fallback}" 以启用默认上限 ${fallback}`,
+          );
+        }
       }
     }
 
@@ -831,12 +933,13 @@ function replanText(alias) {
  * new-run <dir>：开新 Run（Run 边界 = 机械续跑，不找人）。
  *
  * 语义（任务卡 C1b + F1 加固）：
- *   - Run 级四项（Epoch / 完成卡数 / 已用 Repair / 已派子代理）重置为 0；
+ *   - Run 级 8 项（Epoch / 完成卡数 / 已用 Repair / 已派子代理 / WorkSet 规模 / Worker 数 /
+ *     Research pass / 子代理嵌套）重置为 0；缺失的旧行跳过（向后兼容）；
  *   - Mission 级「Run」+1（新 Run 编号 = 递增后的当前值）；Mission 级总量作为记忆保留。
  *
  * 原子性：先完成**整文件**校验与「拒绝条件」判定，只有确定可以写入时才落盘；
  * 任何拒绝路径都在写文件之前返回，绝不触碰文件（拒绝后文件字节不变）。
- * 拒绝时不做部分重置：任一条拒绝 → Run 级四项一格都不动。
+ * 拒绝时不做部分重置：任一条拒绝 → Run 级 8 项一格都不动。
  *
  * 拒绝条件（P1-5 / P1-6，写盘前判定）：
  *   1) 状态错误（非法行 / 重复标签 / 必需项缺失 / 数值越界）；
@@ -845,7 +948,7 @@ function replanText(alias) {
  * 合法例外（不得误杀）：Run 级任一计数器 current == limit（正常耗尽）→ 允许 new-run。
  *
  * 向后兼容：旧文件缺 ## Mission Budget 节 → 按「无上限 + 警告」处理
- * （与 advance 一致）：仍重置 Run 级四项，跳过 Mission Run 递增并警告。
+ * （与 advance 一致）：仍重置 Run 级（缺的见证行跳过），跳过 Mission Run 递增并警告。
  */
 function cmdNewRun(argv) {
   const dir = argv[0];
@@ -915,11 +1018,18 @@ function cmdNewRun(argv) {
     missionRunNext = missionRun.current + 1;
   }
 
-  // ── 第四步：Run 级四项的重置计划（必需项已由整文件校验保证齐全）──
+  // ── 第四步：Run 级八项的重置计划（必需项已由整文件校验保证齐全）──
   const resets = [];
+  const skippedResets = [];
   for (const label of NEW_RUN_RESET_LABELS) {
     const entry = levels.run.lines.find((line) => line.label.toLowerCase() === label.toLowerCase());
     if (!entry) {
+      // F2 向后兼容：旧文件没有新的"机械见证"计数行 → 跳过该行（警告已在上方给出）。
+      // 必需项缺失的情况早在整文件校验里判成 errors 并已返回，走不到这里。
+      if (RUN_WITNESS_LABELS.some((witness) => witness.toLowerCase() === label.toLowerCase())) {
+        skippedResets.push(label);
+        continue;
+      }
       const labels = levels.run.lines.map((e) => e.label).join(' / ') || '（无）';
       return fail(
         `${statePath} 的 ## ${RUN_SECTION} 节里没有 "${label}"（new-run 需重置该项）；现有计数行: ${labels}`,
@@ -960,6 +1070,9 @@ function cmdNewRun(argv) {
     `已重置 Run 级 ${resets.length} 项: ` +
       resets.map((item) => `${item.entry.label} ${item.from} → 0`).join('，'),
   );
+  if (skippedResets.length > 0) {
+    info(`跳过旧文件缺失的 Run 级计数行: ${skippedResets.join(' / ')}（向后兼容，不算错误）`);
+  }
   info(`已写回 ${statePath}`);
   info('下一步: 在新的上下文（新 Run）内继续，无需人工确认（仅 Mission 预算耗尽才需升级给人）。');
   return EXIT_OK;

@@ -58,7 +58,7 @@ The six-step loop makes **one card** reliable. It says nothing about how many ca
 - OpenAI's delegation guidance is the same shape: delegate low-risk, repeatable work; keep ambiguous design and high-risk changes with a human. Hence *auto-accept by default, escalate by exception*.
 - Audit/Discovery is deliberately a **separate mode with no execution authority**: it produces findings, writes them to the backlog, and stops. Backlog is memory, not a queue.
 - Default budgets are **two-level** — both levels are counters in `RUN_STATE.md`, and the limits actually written in that file win over these defaults:
-  - **Run budget — `## Budget`** (context hygiene for a single run): Epoch ≤ 2 · cards completed per Epoch ≤ 6 · WorkSet ≤ 8 · workers 2 (max 3) · repairs per card ≤ 1 · research pass ≤ 1 · subagent nesting ≤ 1.
+  - **Run budget — `## Budget`** (context hygiene for a single run; 8 counter lines whose labels map verbatim to the `init` scaffold and the `advance` aliases): `Epoch` ≤ 2 · `完成卡数` ≤ 6 · `已用 Repair` ≤ 1 · `已派子代理` ≤ 8 · `WorkSet 规模` ≤ 8 · `Worker 数` ≤ 3 · `Research pass` ≤ 1 · `子代理嵌套` ≤ 1.
   - **Mission budget — `## Mission Budget`** (the fuse across all Runs; `new-run` never resets it): Run ≤ 3 · total cards ≤ 12 · total repairs ≤ 3.
   - **Who handles exhaustion**: a spent **Run** budget is handled by the agent itself — write the state file, then `node tools/runstate.js new-run` to continue in a fresh context, and nobody is asked; only a spent **Mission** budget escalates to the human.
 - Numbering them is what turns "be economical" into a value the agent can check rather than an intention it can ignore. Spending a budget is a normal outcome, not a failure.

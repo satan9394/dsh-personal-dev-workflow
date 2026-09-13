@@ -44,7 +44,7 @@ version: "0.5.1"
 六步循环管的是「**一张卡怎么被可靠做完**」；本节管的是「**卡最多能有多少、整轮什么时候必须停**」。完整规则见 `references/production-control.md`。
 
 1. **Mission 信封**：一轮只服务一个 Mission，且有明确的 Definition of Done。可以在 Mission 内自主选择下一张卡，**不得扩大 Mission**；Mission 完成即停止。
-2. **两级预算**（默认可按轮/Mission 覆盖，并记入 `RUN_STATE.md`）。**Run 预算**（`## Budget`）防上下文污染 / Token 膨胀 / 单会话过长：Epoch ≤ 2 · 完成卡数 ≤ 6 · 已用 Repair ≤ 1 · 已派子代理按需——耗尽 → 写 `RUN_STATE.md` → `new-run`（新上下文）→ 继续，**无需人工确认**。
+2. **两级预算**（默认可按轮/Mission 覆盖，并记入 `RUN_STATE.md`）。**Run 预算**（`## Budget`，8 条计数行，标签与 `init` 骨架、`advance` 别名逐字对齐）防上下文污染 / Token 膨胀 / 单会话过长：`Epoch` ≤ 2 · `完成卡数` ≤ 6 · `已用 Repair` ≤ 1 · `已派子代理` ≤ 8 · `WorkSet 规模` ≤ 8 · `Worker 数` ≤ 3 · `Research pass` ≤ 1 · `子代理嵌套` ≤ 1——耗尽 → 写 `RUN_STATE.md` → `new-run`（新上下文）→ 继续，**无需人工确认**。
    **Mission 预算**（`## Mission Budget`）是整个 Mission 的总保险丝：Run ≤ 3 · 总卡数 ≤ 12 · 总 Repair ≤ 3（示例值，可按 Mission 覆盖）——耗尽 → **才升级给人**（加预算或收尾）。完成一张卡会同时递增 Run 的完成卡数与 Mission 的总卡数；任一级触顶 `advance` 都拒绝。
 3. **Audit / Discovery 没有执行权（硬规则）**：发现只写进 `DEFERRED_BACKLOG`，然后**停止**；只有 Development 能改代码，禁止 `Audit → Finding → Task → Code` 这条链。后续某轮 Development 只能挑选与**它自己的 Mission** 相关的条目。
 4. **blocker 准入（消歧）**：新问题若阻塞当前 Mission / 当前卡 → 来源标 `blocker`，**可自动进入 WorkSet，但不得扩大 WorkSet 上限**；WorkSet 已满时替换一张尚未执行的最低优先级卡，被替换者移入 `Deferred Backlog`（并注明来源）。不阻塞 → 直接进 `Deferred Backlog`。
