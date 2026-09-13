@@ -8,6 +8,7 @@
 - 创建日期：YYYY-MM-DD
 - Mission：[本卡服务的那句 Mission]
 - 来源：planned | blocker | human-requested
+  （`blocker` = 阻塞当前 Mission 或已批准卡 → 可自动进入 WorkSet，但**不得扩大 WorkSet 上限**：已满时替换一张尚未执行的最低优先级卡，被替换者移入 `Deferred Backlog` 并注明来源）
 - 关联卡片：（可选）
 
 ## 目标

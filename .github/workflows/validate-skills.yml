@@ -16,3 +16,5 @@ jobs:
           node-version: '20'
       - name: Validate SKILL.md frontmatter and references
         run: node scripts/validate-skills.mjs
+      - name: Run runstate CLI tests (Run/Mission budgets + gate)
+        run: node tools/run-tests.mjs

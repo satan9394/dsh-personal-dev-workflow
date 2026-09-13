@@ -6,7 +6,7 @@ description: "A lean personal development workflow: one conductor + isolated wor
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh, bounded-autonomy]
-version: "0.4.0"
+version: "0.5.0"
 ---
 
 # Personal Dev Workflow v4 (personal-dev-workflow)
@@ -44,11 +44,14 @@ version: "0.4.0"
 The six-step loop governs **how one card gets done**; this section governs **how many cards may exist and when the run must stop**. Full rules: `references/production-control.md`.
 
 1. **Mission envelope**: one run serves one Mission with an explicit Definition of Done. Choose the next card inside it; never enlarge it. Mission done → stop.
-2. **Finite workset + numeric budgets** (defaults; override per run and record in `RUN_STATE.md`): epochs ≤ 3 · cards per epoch ≤ 6 · workset ≤ 8 · workers 2 (max 3) · repairs per card 1 · evaluator 1 · subagent depth 1 · research pass 1.
-3. **Audit / discovery has no execution authority**: findings go to `DEFERRED_BACKLOG` and the run stops there. A later run admits only the items relevant to its own Mission.
-4. **Auto-accept, escalate by exception**: objective gates pass + low risk → auto-accept and continue. Escalate to the human only for product-semantics changes · irreversible or high-risk operations (deploy / delete / publish / credentials / money) · a blocked Mission · budget exhausted with work unfinished.
-5. **Budget exhausted ≠ failure**: write `RUN_STATE.md` (mission, DoD, workset, blocked, deferred backlog, counters, last verified commit, resume point) and stop. The next run resumes from that file — never by re-reading a long history.
-6. **One control policy per project**: this skill owns the development policy; `AGENTS.md` holds project-local rules; a goal is only an execution mechanism. Never stack a second open-ended "keep improving the product" prompt on top — that is how token runaway starts.
+2. **Two-level budget** (defaults; override per run/Mission and record it in `RUN_STATE.md`). **Run Budget** (`## Budget`) guards context pollution, token blow-up and over-long sessions: Epoch ≤ 2 · 完成卡数 ≤ 6 · 已用 Repair ≤ 1 · 已派子代理 as needed — exhausted → write `RUN_STATE.md`, run `new-run` (fresh context) and continue, **no human confirmation**.
+   **Mission Budget** (`## Mission Budget`) is the fuse for the whole Mission: Run ≤ 3 · 总卡数 ≤ 12 · 总 Repair ≤ 3 (example values, overridable per Mission) — exhausted → **escalate to the human** (raise the budget or wrap up). Completing one card increments the Run counter **and** the Mission counter; either level at its cap → `advance` is refused.
+3. **Audit / discovery has no execution authority (hard rule)**: findings go to `DEFERRED_BACKLOG` and the run stops there; only Development may change code, so the chain `Audit → Finding → Task → Code` is forbidden. A later Development run admits only the items relevant to its own Mission.
+4. **Blocker admission (disambiguated)**: a new issue that blocks the current Mission or card → source `blocker`, and it **may enter the workset automatically but never grows the workset cap**; if the workset is full, replace the lowest-priority not-yet-started card and move it to `Deferred Backlog` (noting its source). Does not block → `Deferred Backlog` directly.
+5. **Auto-accept, escalate by exception**: objective gates pass + low risk → auto-accept and continue. Escalate to the human only for product-semantics changes · irreversible or high-risk operations (deploy / delete / publish / credentials / money) · a blocked Mission · **Mission** budget exhausted with work unfinished.
+6. **Budget exhausted ≠ failure**: write `RUN_STATE.md` (mission, DoD, workset, blocked, deferred backlog, counters, last verified commit, resume point) and stop. The next run resumes from that file — never by re-reading a long history.
+7. **Dispatch through the gate (controller)**: before dispatching any card run `node tools/runstate.js gate <project-root>` — only `{"allow":true}` with exit 0 authorizes the dispatch; exit 1 → stop and checkpoint. `resume` prints the recovery plan, `new-run` opens a fresh Run, `status --json` is machine-readable.
+8. **One control policy per project**: this skill owns the development policy; `AGENTS.md` holds project-local rules; a goal is only an execution mechanism. Never stack a second open-ended "keep improving the product" prompt on top — that is how token runaway starts.
 
 ## Rule-file discipline (AGENTS.md / CLAUDE.md)
 

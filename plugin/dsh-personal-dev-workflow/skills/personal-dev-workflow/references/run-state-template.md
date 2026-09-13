@@ -2,6 +2,7 @@
 
 > One file per run. Written at the start, updated as work happens, and always written before a stop.
 > A new session resumes by reading this file — never by re-reading chat history.
+> Counter labels below are exactly the labels `tools/runstate.js` looks up (`advance <dir> <field>`).
 
 ## Mission
 (one sentence: the objective of this run)
@@ -28,13 +29,21 @@ development | audit
 ## Deferred Backlog (memory, not a queue)
 - (finding) — source: audit | blocker | human — logged 2026-09-12
 
-## Budget
-- Epoch: 2 / 3
-- Cards completed: 7
-- Repairs used: 2
-- Subagents spawned: 8
-- Workset size: 8
-- Workers: 2
+## Budget (Run level: context pollution / token blow-up / one over-long session)
+- Epoch: 1 / 2
+- 完成卡数: 3 / 6
+- 已用 Repair: 0 / 1
+- 已派子代理: 2
+- Workset 规模: 4 / 8
+- Worker 数: 2（max 3）
+
+## Mission Budget (Mission fuse: run ≤ 3 · cards ≤ 12 · repairs ≤ 3)
+- Run: 1 / 3
+- 总卡数: 3 / 12
+- 总 Repair: 0 / 3
+
+> Run Budget exhausted → `node tools/runstate.js new-run <project-root>` and continue in a fresh context, no human confirmation.
+> Mission Budget exhausted → stop and escalate to the human (raise the budget or wrap up).
 
 ## Last verified commit
 `abc1234` (tests / build green at this commit)

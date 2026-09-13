@@ -3,6 +3,55 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.5.0] — 2026-09-12 — Mechanically enforced bounded autonomy
+
+v0.4 bounded autonomy was a *methodology*: the budgets and stop conditions were written in prose, and an agent that
+ignored them was only disobeying a document. v0.5 makes them mechanically enforced — the controller refuses an
+over-budget increment and leaves the state file byte-identical, so the limit cannot be talked around.
+
+### Added
+- `tools/runstate.js` — the zero-dependency controller for `RUN_STATE.md`, promoted from the archived evidence CLI
+  into a shipped component. Subcommands: `init` (12-section skeleton) · `check` (strict two-level budget parsing,
+  illegal counter lines reported with their line number) · `advance` (counter guards: run-level `epoch` / `cards` /
+  `repairs` / `subagents`, mission-level `runs` / `totalcards` / `totalrepairs`) · `status` (`--json` for machines) ·
+  `resume` (resume plan: Resume From + next step + whether a new Run is still allowed) · `gate` (the machine gate:
+  `{"allow":true,…}` with exit 0, or `{"allow":false,"reason":…}` with exit 1) · `new-run` (Run-level reset with
+  mission-level carry-over).
+- **Two-level budgets, both enforced mechanically.** Run Budget (`Epoch` · `完成卡数` · `已用 Repair` ·
+  `已派子代理`) protects the context; Mission Budget (`Run` · `总卡数` · `总 Repair`) is the total fuse. A Run-level
+  exhaustion is automatic — `new-run` resets the four Run counters, increments Mission `Run`, and keeps the Mission
+  totals as memory, so the agent continues in a fresh context without asking a human. Only a Mission-level
+  exhaustion escalates to a human. Any increment that would cross either limit is refused with exit 1 and **the
+  state file is left byte-identical** (atomic refusal, asserted by hash in the test suite).
+- `tools/run-tests.mjs` — black-box suite for the controller (22 cases: budget parsing, gate allow/deny, atomic
+  refusal by SHA-256, `new-run` semantics, `resume` wording, plus a failure-injection path).
+- `package.json` script `test:runstate`, and a CI step running `node tools/run-tests.mjs` alongside the skill
+  validator, so the controller cannot regress unnoticed.
+- `files` whitelist: `tools/` now ships in the npm package — the controller is the core of v0.5 and has to travel
+  with the skill.
+
+### Fixed
+- **`new-run` was missing as an entry point.** v0.4 documented "Run exhausted → resume in a new context" but the
+  CLI had no way to open that new Run, and `resume` told the user to get human confirmation at every Run boundary —
+  which contradicts the two-level design (Run boundaries are automatic, only Mission boundaries ask a human).
+  `new-run` now exists, and `resume` at a Run boundary says explicitly that a human is *not* needed.
+- **`init` skeleton default `Epoch: 0 / 3` → `0 / 2`.** Documented and recommended default (and the value in
+  `production-control.md`) is Run `Epoch ≤ 2`; the generated skeleton contradicted it.
+
+### Changed
+- `references/framework.md` (both languages): the default budget block now states the two-level numbers instead of
+  the stale single-level "Epoch 3" — Run: epoch ≤ 2 · cards per epoch ≤ 6 · workset ≤ 8 · workers 2 (max 3) ·
+  repairs per card ≤ 1 · research pass ≤ 1 · subagent depth ≤ 1; Mission: runs ≤ 3 · total cards ≤ 12 · total
+  repairs ≤ 3 — plus the one-line "who handles it" rule (Run exhaustion → automatic `new-run`; Mission exhaustion →
+  escalate to a human).
+- Both `SKILL.md` frontmatter `version` fields now track the repository release number: they were still `0.4.0`
+  while the published package was already `0.4.1`, which is exactly the drift the new validator check prevents.
+
+### Validator
+- `scripts/validate-skills.mjs` gains a **version-consistency check**: every canonical `skills/*/SKILL.md`
+  frontmatter `version` must equal the repository root `package.json` `version`. A mismatch is a FAIL and exits
+  non-zero, so GitHub release number, npm package, plugin bundle and skill metadata can no longer diverge.
+
 ## [0.4.1] — 2026-09-12
 
 ### Fixed
