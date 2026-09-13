@@ -33,9 +33,11 @@ development | audit
 - Epoch: 1 / 2
 - 完成卡数: 3 / 6
 - 已用 Repair: 0 / 1
-- 已派子代理: 2
-- Workset 规模: 4 / 8
-- Worker 数: 2（max 3）
+- 已派子代理: 2 / 8
+- WorkSet 规模: 4 / 8
+- Worker 数: 2 / 3
+- Research pass: 0 / 1
+- 子代理嵌套: 0 / 1
 
 ## Mission Budget (Mission fuse: run ≤ 3 · cards ≤ 12 · repairs ≤ 3)
 - Run: 1 / 3
