@@ -49,7 +49,7 @@ Order: instructions + basic feedback first (make the AI able to run tests) → a
 | Proof of work in handoff | OpenAI Symphony review packet (CI / PR review / demo video) |
 | Human decides & accepts only | OpenAI: "Humans steer, agents execute."; Symphony: "manage work instead of supervising agents" |
 
-## Why bounded autonomy (v0.5.1)
+## Why bounded autonomy (v0.5.2)
 
 The six-step loop makes **one card** reliable. It says nothing about how many cards may exist, and that is exactly where an unbounded run comes from: an open-ended prompt ("keep improving the product") stacked on top of an auto-continuing goal, with audits feeding new cards back into execution forever.
 

@@ -6,7 +6,7 @@ description: "A lean personal development workflow: one conductor + isolated wor
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh, bounded-autonomy]
-version: "0.5.1"
+version: "0.5.2"
 ---
 
 # Personal Dev Workflow v4 (personal-dev-workflow)

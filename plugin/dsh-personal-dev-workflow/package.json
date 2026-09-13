@@ -1,6 +1,6 @@
 {
   "name": "dsh-personal-dev-workflow",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "个人开发工作流 v4（有限自治）：一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环 + 数字预算与停止条件。融合 OpenAI Codex（harness engineering/Symphony）、Anthropic（Claude Code 最佳实践）、DeepSeek Harness 实测，附任务卡/SPEC/验证/生产控制模板。",
   "type": "module",
   "main": "index.js",

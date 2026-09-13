@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://img.shields.io/badge/install-npx%20skills%20add%20satan9394%2Fdsh--personal--dev--workflow-2ea44f)](https://skills.sh)
-[![version](https://img.shields.io/badge/version-0.5.1-informational)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.5.2-informational)](CHANGELOG.md)
 [![agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20DSH%20%7C%20OpenCode-8a2be2)](#install)
 
 > **One conductor + isolated workers + file-based memory + a verification loop + bounded autonomy.**
@@ -42,7 +42,7 @@ Other ways:
 5. **Accept** — gates pass + low risk → auto-accept and continue to the next card; FAIL → one repair; FAIL again → `BLOCKED`.
 6. **Retro** — lessons into `AGENTS.md`, automate anything repeated 3×, garbage-collect stale rules.
 
-## Bounded autonomy (v0.5.1)
+## Bounded autonomy (v0.5.2)
 
 The loop above keeps one card reliable. This layer keeps the whole run bounded, because that is where unbounded runs come from:
 

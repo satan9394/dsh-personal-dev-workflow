@@ -3,6 +3,58 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.5.2] — 2026-09-13 — Mechanical witnesses for the Run-level caps the documents already promised (P1-7)
+
+v0.5.1 was published while the adversarial review's **P1-7** was still open: the finding was never turned into a task
+card, so it was silently left out of that release's scope. The conductor's own post-release self-check caught the
+omission, and this release closes the finding rather than re-describing it. It was cheap to reproduce and entirely
+real — `init` wrote **4** counter lines in `## Budget`, `advance workset` / `advance workers` exited **2** ("unknown
+field"), and `advance subagents` had **no cap at all** (20 pushes reached `已派子代理: 21`). Meanwhile the documents
+promised `WorkSet 规模 ≤ 8`, `Worker 数 ≤ 3` and `已派子代理 ≤ 8`: three commitments with no mechanical witness.
+
+### Fixed
+- **P1-7 — the promised Run-level caps now have witnesses in the file.** `init` scaffolds **8** Run-level counter
+  lines instead of 4: `Epoch` / `完成卡数` / `已用 Repair` / `已派子代理` (promoted from an uncapped note to
+  `0 / 8`) / `WorkSet 规模: 0 / 8` / `Worker 数: 0 / 3` / `Research pass: 0 / 1` / `子代理嵌套: 0 / 1`.
+  `framework.md` also promises `Research pass ≤ 1` and `子代理嵌套 ≤ 1` — the same "commitment without a witness"
+  shape — so the ruling on the card was to close the whole class at once, which is why the final count is 8.
+- The five new caps are folded into **F1's whole-file validation and refuse-as-a-unit semantics**: once any limited
+  counter is at its cap, **any** `advance` exits 1 with the state file left **byte-identical**, and `gate` reports
+  `{"allow":false,…}` on the same condition.
+- **Backward compatibility (required).** A legacy `RUN_STATE.md` that is missing the four new lines, or that writes
+  `已派子代理` / `Worker 数` in the old cap-less note form (e.g. `- Worker 数: 2（上限 3）`, where 上限 3 is only a
+  remark), still passes `check` with **exit 0** plus a warning listing what is missing; `advance` / `new-run` / `gate`
+  behave unchanged. Only a label that is *present* with an invalid or duplicated value is a state error.
+
+### Added
+- Four `advance` field aliases: `workset` → `WorkSet 规模`, `workers` → `Worker 数`, `research` → `Research pass`,
+  `depth` → `子代理嵌套` (case-insensitive; `epoch` / `cards` / `repairs` / `subagents` unchanged). `new-run` now
+  resets **all 8** Run-level counters, skipping legacy lines that are absent instead of failing on them.
+- `tools/run-tests.mjs`: **9 new cases, 34 → 43** — the 8-line skeleton and its 5 caps, the four aliases, cap-refusal
+  with an unchanged SHA256 on each new counter, `gate` DENY at the `WorkSet 规模` cap, `new-run` on both a current and
+  a legacy file, and a cross-document assertion that the EN/ZH `SKILL.md` / `production-control.md` / `framework.md` /
+  `run-state-template.md` spell the 8 labels and 4 aliases exactly as the CLI does.
+
+### Changed
+- Both `references/production-control.md`, both `SKILL.md`, both `references/framework.md` and both
+  `references/run-state-template.md` (EN/ZH) now carry the same 8 counter labels and 4 aliases as the CLI; the sample
+  `RUN_STATE.md` a reader copies was the most visible drift, since it had shown only 6 counter lines.
+- Release number aligned to `0.5.2` in the root `package.json`, `plugin/dsh-personal-dev-workflow/package.json`, both
+  canonical `SKILL.md` frontmatter blocks, the README badge, both `references/framework.md` headings and the README's
+  "Bounded autonomy" heading, with the packaged copies regenerated from `skills/` so the validator is byte-clean.
+
+### Notes
+- **Card-face erratum (7 → 8).** The F2 card first said the `## Budget` section grows to "7" counter lines while
+  enumerating only 6 — a typo on the card, not a design decision. The ruling recorded on that card was to close the
+  whole class of witness-less promises, so the delivered total is **8**; the card was annotated rather than the
+  number being silently reinterpreted.
+- **Honest process note.** P1-7 should have been carded when the review landed; it was not, and v0.5.1 shipped
+  without it. This release exists because the conductor's own post-release self-check found that gap — it is recorded
+  here rather than quietly backfilled into the 0.5.1 entry.
+- Historical version references are intentionally left alone: "v0.5.1 and earlier" in `production-control.md`, "Since
+  v0.5.1" in `SKILL.md`, and the README's "measured" enforcement-boundary heading all describe *when* something was
+  introduced or measured, so bumping them would falsify the record.
+
 ## [0.5.1] — 2026-09-13 — Honesty and coverage: whole-file validation in the controller, and the host gate written down
 
 v0.5.1 has two themes, and neither is cosmetic. First, `advance` / `new-run` only validated *the single line they
