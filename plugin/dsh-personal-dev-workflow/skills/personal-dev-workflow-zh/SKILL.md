@@ -6,7 +6,7 @@ description: 个人开发工作流：一个指挥 + 隔离 Worker + 文件记忆
 metadata:
   type: instruction
   tags: [development, workflow, task-card, dsh, bounded-autonomy]
-version: "0.5.0"
+version: "0.5.1"
 ---
 
 # Personal Dev Workflow v4（personal-dev-workflow）
