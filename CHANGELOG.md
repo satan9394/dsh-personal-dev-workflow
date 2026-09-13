@@ -3,6 +3,94 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [0.5.3] — 2026-09-13 — Agent Skills standard compliance: frontmatter fields put back where the standard says they belong
+
+v0.5.2 was published while the skills were only *DSH-valid*, not *standard-valid*. An audit of the Agent Skills
+specification (reproducible commands in `docs/audit-agent-skills-standard.md`) ran the official reference validator
+against both `SKILL.md` files, and both were **rejected**: this release is a cross-client format-contract fix, not a
+content change. The methodology body, the `description` text and the validator's judgement on the five pre-existing
+rules are all untouched — the release number moves because what the frontmatter promises to *other* clients changed.
+
+### Fixed
+- **Audit finding F-2 — the three non-standard top-level fields are gone.** `slug`, `displayName` and `version` sat at
+  the top level of the frontmatter; the standard's frontmatter whitelist allows only **6** keys
+  (`name` / `description` / `license` / `compatibility` / `metadata` / `allowed-tools`), and the official validator
+  rejected the whole file: *"Unexpected fields in frontmatter: displayName, slug, version"*. `slug` (a duplicate of
+  `name`) was dropped and `displayName` / `version` moved **into** `metadata` — which is where the specification's own
+  examples put `version`.
+- **Audit finding F-1 — `metadata.tags` is a string scalar, not a flow array.** It was written
+  `tags: [development, workflow, task-card, dsh, bounded-autonomy]`; the official YAML parser fails on that line
+  (*"Invalid YAML in frontmatter … flow mapping"*) and the standard types `metadata` as **string → string**, so an
+  array was doubly wrong. It is now the single string
+  `"development, workflow, task-card, dsh, bounded-autonomy"`.
+- **Audit finding F-3 — a body reference that pointed at nothing.** The English `SKILL.md` told readers the Chinese
+  version lived at `SKILL.zh-CN.md` with templates under `references.zh-CN/`; **neither path exists** in the published
+  tree (the Chinese version is its own skill directory, `personal-dev-workflow-zh/`). The line now names that
+  directory. The official validator does **not** check body references, and the repo validator's old pattern only
+  matched bare `references/<file>` — it had no shape for the `references.<x>/` directory form — which is exactly why
+  three separate checks had missed it.
+
+### Added
+- **The two optional standard fields the skills genuinely had values for.** `license: MIT` (the repository root
+  already ships `LICENSE`) and a `compatibility` line stating the real environment requirement — a client-neutral
+  Agent Skill, with Node.js 18+ only for the optional `tools/runstate.js` budget controller and the DSH-only
+  `pre-execute` host gate. Both were audit finding F-5 ("unused optional fields").
+- **Six specification checks in `scripts/validate-skills.mjs`, each proved able to fail.** The repo validator now
+  covers the same field set and value rules as the official validator, as a **supplement, not an equivalent**: the
+  frontmatter key whitelist, no YAML flow collections anywhere in the frontmatter, the `name` charset/length/hyphen
+  rules, `description` ≤ 1024 characters, body references extended to markdown links and `references.<x>/` targets,
+  and string-scalar-only `metadata` values. The two gates are **not** interchangeable, and the measured differences
+  are: a `compatibility` value over 500 characters and a quoted `description: ""` pass this script but are rejected
+  by the official validator (false negatives), while an unquoted `description` such as `Use [this] notation` is
+  rejected here but accepted there (false positive). The official validator wired into CI (see Notes) is the
+  backstop for exactly those differences, which is why it runs **in addition to** this script rather than replacing
+  it. Each specification check carries a stable `[spec:<id>]` tag so the failure path is provable, and **8 negative
+  fixtures** (6 checks; the reference-target check has 3 shapes — bare path, markdown link, dotted directory) each
+  exit 1 naming the intended check. The five pre-existing rules were re-run before/after and still fire on their
+  original cases; the specification checks above are additions layered on them, and the one existing rule whose input
+  moved is rule 5, which now reads `metadata.version` (the F-2 move) instead of the top-level `version`.
+
+### Changed
+- Release number aligned to `0.5.3` in the root `package.json`, `plugin/dsh-personal-dev-workflow/package.json`, both
+  canonical `SKILL.md` **`metadata.version`** fields and the README badge, with the packaged copies regenerated from
+  `skills/` so the byte-for-byte copy check stays clean.
+- The README's Verification section said the validator requires every canonical `SKILL.md` "**`version`** equals the
+  root `package.json` version". That sentence described the pre-F-2 reading and was stale the moment `version` moved
+  into `metadata`; it now says **`metadata.version`**.
+- `docs/audit-agent-skills-standard.md` is the audit this release answers, and is part of the 0.5.3 changeset.
+
+### Notes
+- **CI integration of the official validator (audit recommendation 6) — delivered in this release.** An earlier
+  revision of this Note deferred the work to a follow-up card; it is now a delivered, reproduced gate.
+  `validate-skills.yml` now runs the official reference validator *after* the two
+  pre-existing Node steps, without altering them: `actions/setup-python@v5` (**Python 3.12**) → `pip install` of the
+  reference library pinned to the immutable commit **`69ef37e9424c0a7ea9dd2293b559e43ec8176379`** (`skills-ref`
+  0.1.0) → `skills-ref validate skills/personal-dev-workflow` and `skills-ref validate
+  skills/personal-dev-workflow-zh`. The SHA was resolved with `git ls-remote https://github.com/agentskills/agentskills
+  HEAD` and is pinned rather than tracking `main`, so the gate cannot drift under the repository. Neither validation
+  carries `|| true`: a rejection fails the job.
+- **The F-6 locale defect is neutralised at job level, and the fix was reproduced rather than assumed.**
+  `PYTHONUTF8: '1'` is set on the job (not on a single step), because the reference validator reads `SKILL.md` with
+  `read_text()` and therefore decodes with the platform default encoding. Reproduced on a zh-CN Windows host: with the
+  variable unset the validator exits **1** with `UnicodeDecodeError: 'gbk' codec can't decode byte 0x93 in position
+  2417`; with it set, both skills report `Valid skill` and exit **0**. Linux runners are unaffected by F-6.
+- **Runner matrix — actual scope, stated plainly.** `validate-skills.yml` is a **single-OS** job
+  (`runs-on: ubuntu-latest`), not a 3-OS matrix, so the official-validator gate runs once per event; a "run the full
+  matrix" step would be a change to the existing job's semantics rather than an addition, and was not made. The
+  `PYTHONUTF8` guard sits at job level precisely so that adding `windows-latest` later cannot silently reintroduce
+  F-6.
+- **Local end-to-end run of the new CI steps (evidence for the entry above, not an inference from them).** In an
+  independent venv — `E:\DeepSeek_Harness\workspace\2026_09_04\skill-audit\ci-repro\venv`, never the repository or
+  Anaconda — `pip install` of the same `git+https://github.com/agentskills/agentskills@69ef37e9…#subdirectory=skills-ref`
+  argument built the identical wheel (`skills_ref-0.1.0-py3-none-any.whl`,
+  `sha256:ebe501f61a4a7726a7f47444e6b48b630d0b40909c634ea27dd33240197d732f`) and both commands exited **0** under
+  Python 3.12 and 3.11. The only differences from the CI step are the OS and the local proxy needed to reach GitHub.
+- Historical version references stay as they are: the `0.5.2` changelog entry below, `## Bounded autonomy (v0.5.2)`
+  in the README, and the `## Why bounded autonomy (v0.5.2)` headings in `references/framework.md` all record *when*
+  something shipped, so bumping them would falsify the record rather than align it.
+- The audit's official-validator transcripts in `docs/audit-agent-skills-standard.md` are quoted verbatim and were
+  deliberately **not** edited, even where they show the pre-fix frontmatter.
+
 ## [0.5.2] — 2026-09-13 — Mechanical witnesses for the Run-level caps the documents already promised (P1-7)
 
 v0.5.1 was published while the adversarial review's **P1-7** was still open: the finding was never turned into a task
