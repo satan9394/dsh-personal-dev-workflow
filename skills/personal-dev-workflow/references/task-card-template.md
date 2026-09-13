@@ -8,6 +8,7 @@
 - Created: YYYY-MM-DD
 - Mission: [the one-sentence Mission this card serves]
 - Source: planned | blocker | human-requested
+  (`blocker` = it blocks the current Mission or a card already in the workset → it may enter the workset automatically, but never grows the workset cap: if the workset is full, the lowest-priority not-yet-started card is replaced and moved to `Deferred Backlog` with its source noted)
 - Related cards: (optional)
 
 ## Goal

@@ -8,6 +8,9 @@
  *   3. `description` is present and non-empty; a single-line value containing
  *      ": " must be quoted (unquoted scalars break strict YAML parsers).
  *   4. Every `references/<file>` mentioned in the body exists on disk.
+ *   5. The frontmatter `version` equals the repository root `package.json`
+ *      version (one release number for the whole repository: the skill, the
+ *      plugin bundle, the dist packages and the npm package never drift).
  *
  * B. Every packaged copy (plugin bundle, dist publish packages) must match the
  *    canonical skill byte-for-byte: no missing files, no modified files, no
@@ -21,9 +24,31 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsDir = join(repoRoot, 'skills');
+const rootPackageFile = join(repoRoot, 'package.json');
 
 const failures = [];
 const checked = [];
+const skillVersions = new Map();
+
+/** Version declared by the repository root package.json (the release number). */
+function readRootVersion() {
+  if (!existsSync(rootPackageFile)) {
+    fail('package.json', 'repository root package.json is missing');
+    return null;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(rootPackageFile, 'utf8'));
+  } catch (error) {
+    fail('package.json', `repository root package.json is not valid JSON: ${error.message}`);
+    return null;
+  }
+  if (typeof parsed.version !== 'string' || parsed.version.trim() === '') {
+    fail('package.json', 'repository root package.json has no non-empty "version"');
+    return null;
+  }
+  return parsed.version.trim();
+}
 
 function fail(scope, message) {
   failures.push(`${scope}: ${message}`);
@@ -99,6 +124,14 @@ function checkSkill(skill) {
   for (const ref of new Set(refs)) {
     if (!existsSync(join(skillsDir, skill, ref))) fail(skill, `body references a missing file: ${ref}`);
   }
+
+  // 5. version (compared against the root package.json by the caller)
+  const versionLine = frontmatter.find((l) => /^version:\s*\S/.test(l));
+  if (!versionLine) {
+    fail(skill, 'frontmatter is missing a non-empty "version"');
+    return null;
+  }
+  return versionLine.replace(/^version:\s*/, '').trim().replace(/^["']|["']$/g, '');
 }
 
 function checkCopy(label, copyDir, skill) {
@@ -124,11 +157,28 @@ function checkCopy(label, copyDir, skill) {
 }
 
 // --- A. canonical skills ---
+const rootVersion = readRootVersion();
+
 for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   const before = failures.length;
-  checkSkill(entry.name);
-  if (failures.length === before) checked.push(entry.name);
+  const version = checkSkill(entry.name);
+  if (failures.length === before) {
+    checked.push(entry.name);
+    skillVersions.set(entry.name, version);
+  }
+}
+
+// --- A2. version consistency (skill frontmatter == root package.json) ---
+if (rootVersion !== null) {
+  for (const [skill, version] of skillVersions) {
+    if (version !== rootVersion) {
+      fail(
+        skill,
+        `frontmatter "version" (${version}) must equal the root package.json version (${rootVersion})`,
+      );
+    }
+  }
 }
 
 // --- B. packaged copies ---
@@ -155,7 +205,12 @@ for (const target of copyTargets) {
 }
 
 // --- report ---
-for (const skill of checked) console.log(`ok   canonical ${skill}`);
+for (const [skill, version] of skillVersions) {
+  const matches = rootVersion !== null && version === rootVersion;
+  console.log(
+    `${matches ? 'ok  ' : 'warn'} canonical ${skill} (version ${version} vs package.json ${rootVersion ?? '?'})`,
+  );
+}
 for (const problem of failures) console.error(`FAIL ${problem}`);
 
 const failedScopes = new Set(failures.map((f) => f.split(':')[0]));
@@ -165,3 +220,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(`\nAll ${checked.length} canonical skill(s) and ${copyTargets.length} packaged copy set(s) valid.`);
+if (rootVersion !== null) {
+  console.log(`Version consistency: every canonical SKILL.md declares ${rootVersion}, matching the root package.json.`);
+}

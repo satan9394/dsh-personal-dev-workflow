@@ -49,7 +49,7 @@ Order: instructions + basic feedback first (make the AI able to run tests) → a
 | Proof of work in handoff | OpenAI Symphony review packet (CI / PR review / demo video) |
 | Human decides & accepts only | OpenAI: "Humans steer, agents execute."; Symphony: "manage work instead of supervising agents" |
 
-## Why bounded autonomy (v0.4.0)
+## Why bounded autonomy (v0.5.0)
 
 The six-step loop makes **one card** reliable. It says nothing about how many cards may exist, and that is exactly where an unbounded run comes from: an open-ended prompt ("keep improving the product") stacked on top of an auto-continuing goal, with audits feeding new cards back into execution forever.
 
@@ -57,7 +57,11 @@ The six-step loop makes **one card** reliable. It says nothing about how many ca
 - Anthropic's Planner → Generator → Evaluator split is about **separation of duties**, not about unlimited agent count — so the default here is 2 workers (max 3), not 3–5.
 - OpenAI's delegation guidance is the same shape: delegate low-risk, repeatable work; keep ambiguous design and high-risk changes with a human. Hence *auto-accept by default, escalate by exception*.
 - Audit/Discovery is deliberately a **separate mode with no execution authority**: it produces findings, writes them to the backlog, and stops. Backlog is memory, not a queue.
-- Default budgets (epochs 3 · cards/epoch 6 · workset 8 · workers 2 · repairs 1 · nesting 1 · research 1) exist so "be economical" becomes a number the agent can check rather than an intention it can ignore. Stopping when a budget is spent is a normal outcome, not a failure.
+- Default budgets are **two-level** — both levels are counters in `RUN_STATE.md`, and the limits actually written in that file win over these defaults:
+  - **Run budget — `## Budget`** (context hygiene for a single run): Epoch ≤ 2 · cards completed per Epoch ≤ 6 · WorkSet ≤ 8 · workers 2 (max 3) · repairs per card ≤ 1 · research pass ≤ 1 · subagent nesting ≤ 1.
+  - **Mission budget — `## Mission Budget`** (the fuse across all Runs; `new-run` never resets it): Run ≤ 3 · total cards ≤ 12 · total repairs ≤ 3.
+  - **Who handles exhaustion**: a spent **Run** budget is handled by the agent itself — write the state file, then `node tools/runstate.js new-run` to continue in a fresh context, and nobody is asked; only a spent **Mission** budget escalates to the human.
+- Numbering them is what turns "be economical" into a value the agent can check rather than an intention it can ignore. Spending a budget is a normal outcome, not a failure.
 
 | Also from | Source |
 |---|---|
