@@ -2,7 +2,9 @@
 
 > 这是 `SKILL.md`「有限自治」一节引用的外层控制器。
 > 六步循环保证**一张卡可靠**；本文件保证**整轮有界**。
-> 下面的预算由 `node tools/runstate.js` 机械校验——光写在文档里不构成闸门。
+> 下面的预算在**每次调用 `node tools/runstate.js` 时**被校验；在 DSH 上另有一道 host 闸门
+> （`n3-budget-gate`，挂在 `tools/pre-execute`）会在预算耗尽时拦下**派活类**工具调用。
+> 强制是真的，但有边界：把任何一条说成"机械强制"之前，先读 §10。
 
 ## 1. Mission 信封
 
@@ -76,7 +78,7 @@ Agent 可以在 WorkSet **内部**重排、拆分、丢弃卡片，但**不得�
 
 | 子命令 | 何时用 / 做什么 |
 |---|---|
-| `gate <项目根>` | **每次派活之前**。`{"allow":true}` 且 exit 0 才授权派活；exit 1（`{"allow":false,"reason":…}`）→ 停止、checkpoint、不派 |
+| `gate <项目根>` | **每次派活之前**。`{"allow":true}` 且 exit 0 才授权派活；exit 1（`{"allow":false,"reason":…}`）→ 停止、checkpoint、不派。在 DSH 上，host 闸门（`n3-budget-gate`）会在 `subagent` / `subagent_fork` / `workflow` / `ralph` 派发前自动跑这条同样的命令 —— 见 §10 |
 | `advance <dir> <field>` | 边干边计数。Run 字段：`epoch` / `cards` / `repairs` / `subagents`；Mission 字段：`runs` / `totalcards` / `totalrepairs`。`cards` 与 `repairs` 同时递增两级 |
 | `status <dir> [--json]` | 两级预算摘要；`--json` 供机器读取（含 `exhausted`、`allowNewRun`、各级计数器）。触顶时它的退出码仍是 0 —— 允许/拒绝的判断用 `gate` |
 | `resume <dir>` | 打印恢复计划（Resume From + 下一步 + 是否还允许开新 Run）；只有 Mission 预算耗尽才 exit 1 |
@@ -126,3 +128,21 @@ Agent 可以在 WorkSet **内部**重排、拆分、丢弃卡片，但**不得�
 - 把 backlog 长度当进度。
 - 用加 Worker 提速，而不是缩范围。
 - 从超长聊天历史重启，而不是从状态文件恢复。
+- 不讲 §10 的边界就说预算"被机械强制"——controller 只能约束它被要求执行的命令，host 闸门只能约束派活类调用。
+
+## 10. 强制面与 fail-open / fail-closed 边界（如实写清）
+
+守住这些预算的是两层，强度不同，而且**两层都没有全覆盖**：
+
+| 层 | 覆盖范围 | 强度 |
+|---|---|---|
+| `node tools/runstate.js`（`gate` / `advance` / `new-run`） | 它被要求改动的计数器 | **可检查，但不可强制。** 每次被调用都会拒绝越界递增并把文件保持字节不变；但一个从不调用它的 agent 完全不受它约束 |
+| DSH profile 插件 `n3-budget-gate`（挂 `tools/pre-execute`） | **只门禁派活类工具** —— `subagent` / `subagent_fork` / `workflow` / `ralph` | **硬拦截** —— 派发前即被拒绝，模型收到拒绝理由，工具体根本不执行 |
+
+下面三条是有意为之的设计，不是等着被补上的漏洞：
+
+- **只门禁派活类。** `pwsh` / shell / `read` / `write` / `edit` 等一切执行类或 I/O 类工具**不门禁**。这是防死锁铁律：预算触顶后 agent 必须还能跑 `runstate.js status|advance|new-run`、还能修状态文件，否则"预算耗尽"就等于"永久锁死"。
+- **未管理项目放行。** 项目根没有 `RUN_STATE.md` 就没有预算可守，闸门放行该次派活（并打一条一次性提示）。判定是**精确根**（不向上遍历），子目录一律算未管理。只有主动建了状态文件的项目才被门禁。
+- **闸门缺失时 fail-open。** 若 `n3-budget-gate` 缺失、未加载、被同 profile 的其它层覆盖，或自身抛错，闸门就**静默失效**，派活照常进行 —— 与 `deny-risk-commands` 同一类失效模式。**唯一 fail-closed** 的情形是**已管理项目 + controller 异常**：崩溃 / 输出非 JSON / 超时 / 脚本不存在 → 拒绝派活，理由写明"controller 异常，请修状态文件或删除它"。
+
+还有一条也要说清：host 闸门只覆盖**派活这一个检查点**。它约束不了已经在运行的 worker 内部的消耗，也管不住根本不经过工具调用的消耗。真正的成本闸门仍然是"一个 Mission 一个信封 + 两级预算边干边更新"。

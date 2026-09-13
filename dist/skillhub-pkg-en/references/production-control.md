@@ -2,7 +2,10 @@
 
 > The outer controller referenced by `SKILL.md` §Bounded autonomy.
 > The six-step loop keeps *one card* reliable; this file keeps *the whole run* bounded.
-> The budgets below are machine-checked by `node tools/runstate.js`; prose is not a gate.
+> The budgets below are checked by `node tools/runstate.js` **every time that controller runs**, and on DSH a host
+> gate (`n3-budget-gate`, on the `tools/pre-execute` waterfall) additionally blocks **dispatch-class** tool calls
+> when the budget is exhausted. Enforcement is real but bounded: read §10 before describing any of it as
+> "mechanically enforced".
 
 ## 1. Mission envelope
 
@@ -76,7 +79,7 @@ Zero-dependency. Keep `RUN_STATE.md` parseable and drive the counters through th
 
 | Command | When / what |
 |---|---|
-| `gate <project-root>` | **before every dispatch.** `{"allow":true}` with exit 0 authorizes the dispatch. Exit 1 (`{"allow":false,"reason":…}`) → stop, checkpoint, do not dispatch |
+| `gate <project-root>` | **before every dispatch.** `{"allow":true}` with exit 0 authorizes the dispatch. Exit 1 (`{"allow":false,"reason":…}`) → stop, checkpoint, do not dispatch. On DSH this same command is what the host gate (`n3-budget-gate`) runs automatically before `subagent` / `subagent_fork` / `workflow` / `ralph` — see §10 |
 | `advance <dir> <field>` | count work as it happens. Run fields: `epoch` / `cards` / `repairs` / `subagents`. Mission fields: `runs` / `totalcards` / `totalrepairs`. `cards` and `repairs` increment both levels |
 | `status <dir> [--json]` | two-level summary; `--json` is the machine-readable form (`exhausted`, `allowNewRun`, per-level counters). Its exit code stays 0 even at a cap — use `gate` for the allow/deny decision |
 | `resume <dir>` | prints the recovery plan (Resume From + next step + whether a new Run is still allowed); exits 1 only when the Mission budget is exhausted |
@@ -126,3 +129,21 @@ In a new session or after a context reset:
 - Treating backlog length as progress.
 - Raising worker count to go faster instead of shrinking scope.
 - Restarting from a long chat history instead of the state file.
+- Claiming the budgets are "mechanically enforced" without the §10 boundary — the controller only constrains what it is asked to run, and the host gate only constrains dispatch-class calls.
+
+## 10. Enforcement surface & fail-open/closed boundaries (state it honestly)
+
+Two layers defend these budgets, with different strength — and neither covers everything:
+
+| Layer | Covers | Strength |
+|---|---|---|
+| `node tools/runstate.js` (`gate` / `advance` / `new-run`) | the counters it is asked to touch | **checkable, not enforceable.** It refuses an over-budget increment on every invocation, leaving the file byte-identical; an agent that never invokes it is not constrained by it at all |
+| DSH profile plugin `n3-budget-gate` (on `tools/pre-execute`) | **dispatch-class tools only** — `subagent` / `subagent_fork` / `workflow` / `ralph` | **hard block** — the dispatch is denied before it runs and the model receives the deny reason |
+
+Three boundaries that are deliberate design, not gaps waiting to be patched:
+
+- **Dispatch-class only.** `pwsh` / shell / `read` / `write` / `edit` and every other execution- or I/O-class tool are **not** gated. This is the anti-deadlock rule: with the budget exhausted the agent must still be able to run `runstate.js status|advance|new-run` and to repair the state file, or "exhausted" would mean "permanently locked out".
+- **Unmanaged projects pass.** A project root with no `RUN_STATE.md` has no budget to enforce, so the gate allows the dispatch (with a one-time notice). The check is **exact-root** (no upward walk), so a subdirectory always counts as unmanaged. Only projects that opted in by creating a state file are gated.
+- **Fail-open when the gate is absent.** If `n3-budget-gate` is missing, not loaded, overridden by another layer of the same profile, or throwing internally, the gate **silently disappears** and dispatches proceed ungated — the same failure class as `deny-risk-commands`. The **only fail-closed** case is a **managed project whose controller misbehaves**: crash, non-JSON output, timeout, or a missing controller script → the dispatch is denied with "controller 异常，请修状态文件或删除它".
+
+Also true and worth saying: the host gate covers the **dispatch checkpoint only**. It cannot constrain work already running inside a dispatched worker, and it says nothing about consumption that never goes through a tool call. The real cost gate remains "one envelope per Mission + two-level budgets, updated as work happens".

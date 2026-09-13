@@ -24,6 +24,9 @@ jobs:
       - name: Validate skills before publishing
         run: node scripts/validate-skills.mjs
 
+      - name: Run runstate controller tests before publishing
+        run: node tools/run-tests.mjs
+
       - name: Publish to GitHub Packages
         run: npm publish
         env:
