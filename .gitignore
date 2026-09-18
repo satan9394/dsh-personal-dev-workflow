@@ -3,3 +3,20 @@ __pycache__/
 *.pyc
 .DS_Store
 *.log
+
+# --- security hardening (added 2026-09-18) ---
+# env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_ed25519
+.netrc
+.npmrc.local
+.pypirc
+secrets.json
