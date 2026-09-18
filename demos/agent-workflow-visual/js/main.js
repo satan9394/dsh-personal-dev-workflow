@@ -21,6 +21,13 @@
     if (parent) parent.appendChild(n);
     return n;
   }
+  function markerId() {
+    var bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += ("0" + bytes[i].toString(16)).slice(-2);
+    return "m" + s;
+  }
 
   /* ============================================================
    * 1) HERO Canvas：总指挥星座（conductor + orbiting workers）
@@ -246,7 +253,7 @@
     container.innerHTML = "";
     container.appendChild(svg);
 
-    var uid = "m" + Math.random().toString(36).slice(2, 8);
+    var uid = markerId();
     var defs = el("defs", null, svg);
     var marker = el("marker", { id: "arr-" + uid, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
     el("path", { d: "M0,0 L10,5 L0,10 z", fill: "#94a3b8" }, marker);
