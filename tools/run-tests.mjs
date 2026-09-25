@@ -1054,6 +1054,11 @@ test('㊶ F2 new-run 重置 Run 级 8 项，旧文件缺新行时仍可用', () 
 });
 
 // ㊷ F2：文档与 CLI 标签逐字一致（8 个标签 + 4 个新别名），防止文档再次跑偏
+//
+// v1.0.0 说明：`tools/runstate.js` 是 **v0.5.x 的 Markdown `RUN_STATE.md` 控制器**，它不再是
+// `skills/` 里 v1.0.0 skill 的一部分（v1.0.0 用 JSON `.agent-state/run-state.json`，控制器在
+// `skills/*/scripts/runstate.js`）。v0.5.x 的配套文档因此随 skill 替换一并迁出，保存在
+// `tools/docs/{en,zh}/`，本用例改为校验那一份——语言与内容契约不变，只是换了家。
 test('㊷ F2 中英文档与 CLI 标签逐字一致（8 标签 + 4 别名）', () => {
   const labels = [
     'Epoch',
@@ -1066,16 +1071,14 @@ test('㊷ F2 中英文档与 CLI 标签逐字一致（8 标签 + 4 别名）', (
     '子代理嵌套',
   ];
   const aliases = ['subagents', 'workset', 'workers', 'research', 'depth'];
-  // 四类文档 × 中英：SKILL.md / production-control / framework / run-state-template
+  // v0.5.x 的文档保存在 tools/docs/（见上方说明），结构：tools/docs/<lang>/<file>
   const docs = [
-    'skills/personal-dev-workflow/SKILL.md',
-    'skills/personal-dev-workflow-zh/SKILL.md',
-    'skills/personal-dev-workflow/references/production-control.md',
-    'skills/personal-dev-workflow-zh/references/production-control.md',
-    'skills/personal-dev-workflow/references/framework.md',
-    'skills/personal-dev-workflow-zh/references/framework.md',
-    'skills/personal-dev-workflow/references/run-state-template.md',
-    'skills/personal-dev-workflow-zh/references/run-state-template.md',
+    'tools/docs/en/production-control.md',
+    'tools/docs/zh/production-control.md',
+    'tools/docs/en/framework.md',
+    'tools/docs/zh/framework.md',
+    'tools/docs/en/run-state-template.md',
+    'tools/docs/zh/run-state-template.md',
   ];
   for (const rel of docs) {
     const file = path.join(PROJECT_ROOT, rel);
@@ -1116,7 +1119,7 @@ test('㊷ F2 中英文档与 CLI 标签逐字一致（8 标签 + 4 别名）', (
     }
   }
   // 生产控制文档里的默认值与 init 骨架必须一致（逐条对照上限）
-  const zh = fs.readFileSync(path.join(PROJECT_ROOT, docs[3]), 'utf8');
+  const zh = fs.readFileSync(path.join(PROJECT_ROOT, 'tools/docs/zh/production-control.md'), 'utf8');
   for (const [label, limit] of [
     ['已派子代理', 8],
     ['WorkSet 规模', 8],

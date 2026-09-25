@@ -33,12 +33,20 @@ dsh-personal-dev-workflow/
 ├── cordis.patch.yml   # bundle patch 层
 ├── package.json       # dsh.bundle manifest
 └── skills/personal-dev-workflow/
-    ├── SKILL.md                       # v3 主文件（正文 67 行，去冗余）
-    └── references/
-        ├── framework.md               # 可选背景：五组件/出处/成本数字/与顶级公司对照
-        ├── task-card-template.md      # 任务卡模板
-        ├── spec-template.md           # SPEC 模板（含 Not Doing / 关键假设）
-        └── verify-checklist.md        # 验证清单（Review 五件事 / 熔断）
+    ├── SKILL.md                       # v1.0.0 主文件（正文 86 行，路由 + 核心契约）
+    ├── references/                    # 11 份按需加载文档
+    │   ├── core-loop.md               # 六步闭环的完整执行细节
+    │   ├── verification.md            # 按任务类型的证据画像
+    │   ├── memory-policy.md           # 一个事实只存一处
+    │   ├── bounded-autonomy.md        # Mission 信封 / 两级预算 / 恢复
+    │   ├── state-schema.md            # .agent-state/run-state.json 格式
+    │   ├── model-profiles.md          # planner/executor/evaluator 能力画像
+    │   ├── adapter-{dsh,codex,claude-code}.md
+    │   ├── preset-agy-codex.md        # 可选：规划→执行流水线预设
+    │   └── migration-v0.5.3.md        # 从 v0.5.x 迁移
+    ├── assets/                        # task-card / spec / handoff 模板
+    ├── evals/                         # 行为用例：trigger / workflow / autonomy / recovery
+    └── scripts/                       # runstate.js 状态控制器 + validate-skill.py
 ```
 
 ## License

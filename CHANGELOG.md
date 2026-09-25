@@ -3,6 +3,63 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [1.0.0] — 2026-09-24 — Structural rework: four modes, JSON state, layered enforcement
+
+v1.0.0 restores the Skill as an **on-demand workflow capability** rather than a large always-loaded rule
+document. The six-step loop keeps one card reliable; this release separates *runtime control*, *state* and
+*platform adaptation* into layers so none of them is mistaken for a host hard gate.
+
+### Changed
+- **Four explicit modes replace the implicit default.** `quick` / `standard` / `bounded` / `audit`.
+  `standard` (the default) completes one card, shows evidence and **stops** — it no longer auto-continues to
+  the next card. Continuous autonomy now requires an explicit `bounded` opt-in; installing the Skill, having
+  task cards, or having an `AGENTS.md` does **not** constitute authorization.
+- **Machine state moved out of Markdown.** `.agent-state/run-state.json` is the source of truth;
+  `RUN_STATE.md` is only a rendered view. The v0.5.x controller read and wrote the Markdown file directly.
+- **Worker accounting split into a gauge and a counter.** `workers.active` can go up and down
+  (`worker-start` / `worker-stop`); `workersSpawned` only increases. This removes the v0.5.x behaviour where a
+  finished worker kept occupying a concurrency slot.
+- **Budgets are action-scoped.** Reaching the repair cap only rejects new repairs; reaching the research cap
+  only rejects new research; a spent worker cap only rejects dispatching more workers. The main agent can
+  still finish the card it is on.
+- **The body shrank to routing and the core contract** (86 lines); per-aspect detail now lives in
+  `references/` and loads on demand.
+- **Chinese variant must have its own skill name.** `personal-dev-workflow-zh` — the standard requires
+  `name` to match the folder, and two skills cannot share one name.
+
+### Added
+- **Task-typed verification evidence** — docs / backend / frontend / infra / security each use their most
+  relevant evidence instead of mechanically demanding tests + build + screenshots (`references/verification.md`).
+- **Memory taxonomy** — AGENTS / ADR-docs / Task Card / machine state / changelog each own one fact; small
+  cards are no longer forced to write daily log + CHANGELOG + state + AGENTS all at once (`references/memory-policy.md`).
+- **Model capability profiles** — the core binds to no model name; planner / executor / evaluator /
+  researcher capability contracts live in the core, specific models go into optional presets
+  (`references/model-profiles.md`, `references/preset-agy-codex.md`).
+- **Adapter docs** — DSH, Codex and Claude Code, each stating what the host can and cannot enforce
+  (`references/adapter-*.md`).
+- **Behavioural eval cases** — trigger / workflow / autonomy / recovery (`evals/`), so behaviour is verified
+  rather than only format.
+- **Per-skill validators and a manifest** — `scripts/validate-skill.py` checks structure, frontmatter and
+  local references; `MANIFEST.sha256` pins the shipped files.
+- **`scripts/package.json`** declaring `commonjs`, so the shipped controller runs even when the host project
+  has `"type": "module"` (Node would otherwise parse the CommonJS `runstate.js` as ESM and fail).
+
+### Fixed
+- **The generic Skill no longer claims host enforcement.** v0.5.x prose described budgets as "enforced" while
+  the controller could only refuse *the write it was asked to perform*. v1.0.0 states the boundary explicitly:
+  the controller is checkable, not enforceable; a true pre-execute hard gate is adapter-specific.
+- **No unverified DSH plugin is shipped as ready-to-use.** Hook APIs vary between DSH versions, so v1.0.0
+  provides the stable controller contract plus an adapter description, not plugin code presented as a
+  ready-made hard gate.
+
+### Kept for reference (v0.5.x, not part of the v1.0.0 state model)
+- `tools/runstate.js` and its 34-case `tools/run-tests.mjs` — the Markdown `RUN_STATE.md` controller.
+- `plugin/dsh-budget-gate/` — the DSH host gate for the Markdown model, byte-identical to the deployed copy.
+- `docs/case-study-bounded-autonomy.md`, `docs/evidence/runstate-cli/` — the three-run bounded-autonomy
+  evidence, gathered under the Markdown model.
+- `taskcard-cli.js` — task-card CLI, still applicable.
+  These are retained so the historical evidence keeps resolving; see the README's "Legacy v0.5.x artifacts".
+
 ## [0.5.3] — 2026-09-13 — Agent Skills standard compliance: frontmatter fields put back where the standard says they belong
 
 v0.5.2 was published while the skills were only *DSH-valid*, not *standard-valid*. An audit of the Agent Skills
@@ -80,8 +137,7 @@ rules are all untouched — the release number moves because what the frontmatte
   `PYTHONUTF8` guard sits at job level precisely so that adding `windows-latest` later cannot silently reintroduce
   F-6.
 - **Local end-to-end run of the new CI steps (evidence for the entry above, not an inference from them).** In an
-  independent venv — `E:\DeepSeek_Harness\workspace\2026_09_04\skill-audit\ci-repro\venv`, never the repository or
-  Anaconda — `pip install` of the same `git+https://github.com/agentskills/agentskills@69ef37e9…#subdirectory=skills-ref`
+  independent venv — `~/skill-audit/ci-repro/venv`, never the repository or the system Python — `pip install` of the same `git+https://github.com/agentskills/agentskills@69ef37e9…#subdirectory=skills-ref`
   argument built the identical wheel (`skills_ref-0.1.0-py3-none-any.whl`,
   `sha256:ebe501f61a4a7726a7f47444e6b48b630d0b40909c634ea27dd33240197d732f`) and both commands exited **0** under
   Python 3.12 and 3.11. The only differences from the CI step are the OS and the local proxy needed to reach GitHub.

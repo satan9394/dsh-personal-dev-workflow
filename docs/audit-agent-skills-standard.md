@@ -62,16 +62,16 @@ metadata:
 ## 可复现命令
 
 ```powershell
-# 一次性：取官方参考库并装进独立 venv（不污染 Anaconda）
-$audit='E:\DeepSeek_Harness\workspace\2026_09_04\skill-audit'
+# 一次性：取官方参考库并装进独立 venv（不污染系统 Python）
+$audit="$HOME\skill-audit"
 git -c http.proxy=http://127.0.0.1:<PORT> clone --depth 1 https://github.com/agentskills/agentskills $audit\agentskills
-& 'D:\Technology_application\Anconda_All\Anaconda3\envs\claude\python.exe' -m venv $audit\venv
+& 'python' -m venv $audit\venv
 & "$audit\venv\Scripts\python.exe" -m pip install --proxy http://127.0.0.1:<PORT> -e "$audit\agentskills\skills-ref"
 
-# 每次校验（PYTHONUTF8 必设，否则本机 GBK 崩溃）
+# 每次校验（PYTHONUTF8 必设，否则 Windows GBK 环境会崩溃）
 $env:PYTHONUTF8='1'
-& "$audit\venv\Scripts\skills-ref.exe" validate 'E:\DeepSeek_Harness\workspace\2026_09_06\release\dsh-personal-dev-workflow\skills\personal-dev-workflow'
-& "$audit\venv\Scripts\skills-ref.exe" validate 'E:\DeepSeek_Harness\workspace\2026_09_06\release\dsh-personal-dev-workflow\skills\personal-dev-workflow-zh'
+& "$audit\venv\Scripts\skills-ref.exe" validate '<repo>\skills\personal-dev-workflow'
+& "$audit\venv\Scripts\skills-ref.exe" validate '<repo>\skills\personal-dev-workflow-zh'
 ```
 
-沙盒验证副本（改法已 PASS，可直接对照）：`E:\DeepSeek_Harness\workspace\2026_09_04\skill-audit\probe\{personal-dev-workflow, personal-dev-workflow-zh}`
+沙盒验证副本（改法已 PASS，可直接对照）：`$audit\probe\{personal-dev-workflow, personal-dev-workflow-zh}`

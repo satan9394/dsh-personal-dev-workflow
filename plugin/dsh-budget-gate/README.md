@@ -134,10 +134,12 @@ tail -n 20 ~/.dsh/logs/n3-budget-gate.jsonl
 
 ## 与仓库其它部分的关系
 
-- 判定逻辑与边界同时写在 `skills/personal-dev-workflow/SKILL.md`
-  §"Enforcement surface & fail-open/closed boundaries" 与两份 `references/production-control.md` §10，
+- 判定逻辑与边界同时写在 v0.5.x 的两份文档里：`tools/docs/en/production-control.md` §10 与 `tools/docs/zh/production-control.md` §10（原文在 `skills/` 下，随 v1.0.0 替换 skill 一并迁到 `tools/docs/`），
   三处口径必须一致；改本插件的判定就同步改它们。
 - controller 本体是 `tools/runstate.js`（`gate` 子命令输出那行 JSON），测试是 `node tools/run-tests.mjs`。
+- **适用模型**：本插件针对 **v0.5.x 的 Markdown `RUN_STATE.md` 模型**。v1.0.0 改为 JSON
+  `.agent-state/run-state.json`，其宿主接入方式见 `skills/personal-dev-workflow/references/adapter-dsh.md`
+  （v1.0.0 未随包提供现成的 host 插件代码）。
 
 ## License
 

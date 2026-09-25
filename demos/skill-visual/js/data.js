@@ -42,10 +42,10 @@ window.DATA = {
   ],
 
   templates: [
-    { icon: "🎫", title: "任务卡模板", desc: "目标/限制条件/客观门禁/涉及文件/预期证据", path: "../../skills/personal-dev-workflow/references/task-card-template.md" },
-    { icon: "📐", title: "SPEC 模板", desc: "Not Doing + 关键假设（含验证法）+ 验收标准", path: "../../skills/personal-dev-workflow/references/spec-template.md" },
-    { icon: "✅", title: "验证清单", desc: "Review 五件事 + 对抗性评审 + 熔断检查", path: "../../skills/personal-dev-workflow/references/verify-checklist.md" },
-    { icon: "📖", title: "背景与出处（可选）", desc: "五组件/100 行原则/成本数字/公司做法对照", path: "../../skills/personal-dev-workflow/references/framework.md" }
+    { icon: "🎫", title: "任务卡模板", desc: "目标/限制条件/客观门禁/涉及文件/预期证据", path: "../../skills/personal-dev-workflow/assets/task-card.md" },
+    { icon: "📐", title: "SPEC 模板", desc: "Not Doing + 关键假设（含验证法）+ 验收标准", path: "../../skills/personal-dev-workflow/assets/spec.md" },
+    { icon: "✅", title: "验证证据画像", desc: "按任务类型选证据：docs/后端/前端/基础设施/安全", path: "../../skills/personal-dev-workflow/references/verification.md" },
+    { icon: "📖", title: "有限自治与状态模型", desc: "Mission 信封 / 两级预算 / JSON 状态 / 恢复", path: "../../skills/personal-dev-workflow/references/bounded-autonomy.md" }
   ],
 
   checklist: [

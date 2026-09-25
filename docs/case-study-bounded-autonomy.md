@@ -1,6 +1,8 @@
 # Case study: bounded autonomy, tested over three runs
 
-This is the empirical evidence behind the skill's **bounded autonomy** section (`SKILL.md` §Bounded autonomy, `references/production-control.md`). It is not a description of what *should* happen — it is what *did* happen when the workflow ran a real (small) project with deliberately tiny budgets.
+This is the empirical evidence behind the skill's **bounded autonomy** section. It is not a description of what *should* happen — it is what *did* happen when the workflow ran a real (small) project with deliberately tiny budgets.
+
+> **v1.0.0 note.** This case study was gathered under the **v0.5.x model**, where bounded autonomy was driven by the Markdown `RUN_STATE.md` and the controller `tools/runstate.js`. v1.0.0 moved the state to JSON (`.agent-state/run-state.json`) with the controller inside each skill (`skills/*/scripts/runstate.js`) and made autonomy explicit opt-in. The evidence is retained unchanged because it is historical; the rules it documents now live in `skills/personal-dev-workflow/references/bounded-autonomy.md`, and the v0.5.x docs it referenced were moved to `tools/docs/`.
 
 Runnable evidence lives in [`docs/evidence/runstate-cli/`](evidence/runstate-cli/): the five accepted task cards, both run summaries and the final `RUN_STATE.md` from the three runs. **The archived copies of the CLI and of the 9-case suite that used to sit in that directory were removed on 2026-09-13** (stale duplicates of the shipped code) — the live files are [`tools/runstate.js`](../tools/runstate.js) and the 34-case [`tools/run-tests.mjs`](../tools/run-tests.mjs), as the evidence README now states.
 
