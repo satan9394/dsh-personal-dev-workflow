@@ -1,8 +1,13 @@
 name: publish-package
 
+# NOTE (2026-10-04): automatic publish on release is intentionally disabled.
+# Publishing to GitHub Packages currently fails with
+#   npm error 403 ... permission_denied: write_package
+# because the package `@satan9394/dsh-personal-dev-workflow` appears to still be
+# linked to a previously deleted repository; clearing that needs package admin
+# (delete / relink), which is outside this workflow's reach. Run this workflow
+# manually via workflow_dispatch once the package ownership is resolved.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
