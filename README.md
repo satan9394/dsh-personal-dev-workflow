@@ -172,6 +172,11 @@ This repo practices what the skill preaches:
 - `npx skills add satan9394/dsh-personal-dev-workflow --list` must discover both skills.
 - The workflow itself was exercised end-to-end on real projects: a task-card CLI (cards → isolated executor → proof of work → verification → acceptance → retro), and a **three-run bounded-autonomy test** under the v0.5.x model — five cards auto-accepted with zero per-card sign-off, both stop conditions observed (budget exhausted, DoD met). Case study: [`docs/case-study-bounded-autonomy.md`](docs/case-study-bounded-autonomy.md) · runnable evidence: [`docs/evidence/runstate-cli/`](docs/evidence/runstate-cli/).
 
+## Releasing
+
+Roughly **every 15 days**, or skipped when nothing substantial changed. Every release summarises the
+changes since the previous tag; see [`RELEASING.md`](RELEASING.md).
+
 ## Sources
 
 Distilled from OpenAI Codex (harness engineering / Symphony), Anthropic (Claude Code best practices) and DeepSeek Harness field experience. Per-aspect rationale lives in the skill's `references/` (core loop, verification, memory policy, bounded autonomy, model profiles, adapters).
