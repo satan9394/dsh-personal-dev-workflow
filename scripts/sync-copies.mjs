@@ -16,15 +16,13 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsDir = join(repoRoot, 'skills');
-
 const targets = [
   {
     dir: join(repoRoot, 'plugin', 'dsh-personal-dev-workflow', 'skills'),
-    skills: ['personal-dev-workflow', 'personal-dev-workflow-zh'],
+    skills: ['personal-dev-workflow'],
     nested: true,
   },
-  { dir: join(repoRoot, 'dist', 'skillhub-pkg-en'), skills: ['personal-dev-workflow'], nested: false },
-  { dir: join(repoRoot, 'dist', 'skillhub-pkg-zh'), skills: ['personal-dev-workflow-zh'], nested: false },
+  { dir: join(repoRoot, 'dist', 'skillhub-pkg'), skills: ['personal-dev-workflow'], nested: false },
 ];
 
 function listFiles(dir, base = dir) {

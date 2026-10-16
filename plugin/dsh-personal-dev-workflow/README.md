@@ -1,10 +1,10 @@
 # dsh-personal-dev-workflow
 
-个人开发工作流 skill 的 DSH 插件形态（bundle）：把 v3 版 `personal-dev-workflow` skill 及其模板打包，
+个人开发工作流 skill 的 DSH 插件形态（bundle）：把 v2 版 `personal-dev-workflow` skill 打包，
 可通过 `dsh plugin add` 安装到任意 DSH profile。
 
-核心：**一个指挥 + 隔离 Worker + 文件记忆 + 验证闭环**；任务卡六步循环（拆卡→派活→交证→验证→验收→复盘）；
-人只做提需求与拍板。
+核心：**唯一协调者**把目标编译成任务契约，跨 OpenCode / Codex / AGY 分派隔离角色会话，
+跑真实检查、独立复核，并按已记录证据恢复；人只提需求与拍板。
 
 ## 安装
 
@@ -18,12 +18,11 @@ dsh plugin --profile web add link:<本仓库路径>
 
 ## 使用
 
-对 agent 说"开工 / 拆任务卡 / 实现这个功能 / 修这个 bug"，`personal-dev-workflow` 技能会按
-六步循环推进：拆卡落盘 `tasks/` → 每张卡一个隔离执行器 → 交证 → 验证 → 你拍板 → 复盘。
+对 agent 说"用 PDW 在 <项目> 完成 <目标>"，或"开工 / 实现这个功能 / 修这个 bug"，
+`personal-dev-workflow` 会按 契约 → 分派 → 检查 → 独立复核 → 交接 推进；
+默认结果简报四行：结论 / 改动 / 验证 / 下一步。
 
-插件内置两个 skill：
-- `personal-dev-workflow` —— 英文版（默认）
-- `personal-dev-workflow-zh` —— 中文版（正文与模板为中文，description 用中文触发词）
+插件内置一个 skill：`personal-dev-workflow`（正文 zh-CN，description 用英文触发词）。
 
 ## 结构
 
@@ -33,21 +32,15 @@ dsh-personal-dev-workflow/
 ├── cordis.patch.yml   # bundle patch 层
 ├── package.json       # dsh.bundle manifest
 └── skills/personal-dev-workflow/
-    ├── SKILL.md                       # v1.0.0 主文件（正文 86 行，路由 + 核心契约）
-    ├── references/                    # 11 份按需加载文档
-    │   ├── core-loop.md               # 六步闭环的完整执行细节
-    │   ├── verification.md            # 按任务类型的证据画像
-    │   ├── memory-policy.md           # 一个事实只存一处
-    │   ├── bounded-autonomy.md        # Mission 信封 / 两级预算 / 恢复
-    │   ├── state-schema.md            # .agent-state/run-state.json 格式
-    │   ├── model-profiles.md          # planner/executor/evaluator 能力画像
-    │   ├── adapter-{dsh,codex,claude-code}.md
-    │   ├── preset-agy-codex.md        # 可选：规划→执行流水线预设
-    │   └── migration-v0.5.3.md        # 从 v0.5.x 迁移
-    ├── assets/                        # task-card / spec / handoff 模板
-    ├── evals/                         # 行为用例：trigger / workflow / autonomy / recovery
-    └── scripts/                       # runstate.js 状态控制器 + validate-skill.py
+    ├── SKILL.md                  # v2.0.0 主文件（73 行）
+    ├── references/runtime.md     # 契约字段、CLI 用法、扩展边界
+    ├── agents/openai.yaml        # Codex 侧展示信息
+    ├── assets/audit-task.json    # 只读审查契约样例
+    └── scripts/                  # pdw.mjs（CLI 接力）+ drivers.mjs + pdw.test.mjs
 ```
+
+v1.0.0 时代的 skill（六步任务卡循环 + `runstate.js` 控制器 + evals + 适配器文档）不再随 skill
+发布；仓库 `tools/`、`plugin/dsh-budget-gate/`、`docs/` 与 tag `v1.0.0` 仍保留那条线。
 
 ## License
 

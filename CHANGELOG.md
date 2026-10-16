@@ -3,6 +3,50 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [2.0.0] — 2026-10-16 — Executable relay: one coordinator, CLI-dispatched role sessions
+
+v2.0.0 replaces the skill body with the line developed in the author's PDW research project (shipped there as
+`1.3.1-local`). The workflow stops being a document the agent is asked to follow and becomes a program the agent
+drives: `scripts/pdw.mjs` freezes a contract, dispatches `scan → test-plan → implement → review` (plus an
+optional `planner`) to CLI agents, runs the acceptance commands itself, keeps every raw log, and allows at most
+one targeted repair. This is a breaking release for anyone installing the skill by name.
+
+### Changed
+- **The skill is now executable.** `skills/personal-dev-workflow/SKILL.md` is a 73-line zh-CN body (English
+  `description` so English-language agents still trigger it) that drives `scripts/pdw.mjs` — `init` / `doctor` /
+  `new` / `plan` / `run` / `status` / `handoff` / `cancel` / `resume` / `demo` / `install`, all with `--project`.
+- **One skill, not two.** `personal-dev-workflow-zh` is retired; the surviving skill is named
+  `personal-dev-workflow` and its body is Chinese. `dist/skillhub-pkg-en` + `dist/skillhub-pkg-zh` collapse into
+  a single `dist/skillhub-pkg`, and the plugin bundle carries one skill.
+- **State model replaced.** Run state is `.pdw/tasks/<id>/state.json` beside `contract.json` (frozen contract)
+  and `baseline.json` (starting hashes); `HANDOFF.md` and `REPORT.md` are re-derivable views. `status` and
+  `handoff` re-hash the sources, so an acceptance recorded before a source change comes back as
+  `accepted_current=false` instead of being reused.
+- **Limits are the ones the program can actually enforce** — CLI launches, elapsed time, single-process timeout
+  and repair count. Money/token ceilings are recorded as `unknown`: with no provider usage evidence the skill no
+  longer claims a currency cap, and it says so instead of implying one.
+- **Cost routing is explicit in config.** The `.pdw/config.json` roles (`scan / test-plan / implement / review /
+  planner`) each carry backend / executable / model; `init` only selects the low-cost model it can actually
+  identify and never silently falls back to an expensive default.
+- **The release number moves in all three manifests** — root `package.json`, the plugin manifest and every
+  canonical `metadata.version` now declare `2.0.0`.
+- **CI** — the retired en/zh validator pair becomes a single `skills-ref validate skills/personal-dev-workflow`
+  step, and the relay's own suite (`node skills/personal-dev-workflow/scripts/pdw.test.mjs`, 20 cases) joins the job.
+
+### Removed from the skill (the v1.0.0 content stays reachable at tag `v1.0.0`)
+- 11 `references/` documents (core loop, verification, memory policy, bounded autonomy, state schema, model
+  profiles, adapters, migration), 4 `evals/` suites, 3 `assets/` templates, `scripts/runstate.js` +
+  `scripts/runstate.test.js` + `scripts/validate-skill.py` + `scripts/package.json`, and the per-skill
+  `MANIFEST.sha256` / `CHANGELOG.md` / `README.md` / `LICENSE` copies — 27 files replaced by 7.
+- The claimed host-enforcement story (`gate` / `advance` / `worker-start` subcommands, Run/Mission budgets) leaves
+  the skill: v2.0.0 states the boundary instead of shipping an adapter that was never verified as ready-to-use.
+
+### Kept (not loaded by this skill)
+- `tools/runstate.js` + `tools/run-tests.mjs` — the v0.5.x Markdown `RUN_STATE.md` controller and its 43-case
+  suite; the author's deployed DSH profile still points at this controller (its host gate is currently disabled).
+- `plugin/dsh-budget-gate/` (v0.5.x host gate, byte-identical to the deployed copy), `docs/`, `demos/` and
+  `taskcard-cli.js` — historical evidence and standalone tools, unchanged.
+
 ## [1.0.0] — 2026-09-24 — Structural rework: four modes, JSON state, layered enforcement
 
 v1.0.0 restores the Skill as an **on-demand workflow capability** rather than a large always-loaded rule

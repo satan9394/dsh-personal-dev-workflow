@@ -458,11 +458,10 @@ const copyTargets = [
   {
     label: 'plugin',
     dir: join(repoRoot, 'plugin', 'dsh-personal-dev-workflow', 'skills'),
-    skills: ['personal-dev-workflow', 'personal-dev-workflow-zh'],
+    skills: ['personal-dev-workflow'],
     nested: true,
   },
-  { label: 'dist-en', dir: join(repoRoot, 'dist', 'skillhub-pkg-en'), skills: ['personal-dev-workflow'], nested: false },
-  { label: 'dist-zh', dir: join(repoRoot, 'dist', 'skillhub-pkg-zh'), skills: ['personal-dev-workflow-zh'], nested: false },
+  { label: 'dist', dir: join(repoRoot, 'dist', 'skillhub-pkg'), skills: ['personal-dev-workflow'], nested: false },
 ];
 
 for (const target of copyTargets) {

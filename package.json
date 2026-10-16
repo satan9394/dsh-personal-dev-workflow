@@ -1,7 +1,7 @@
 {
   "name": "@satan9394/dsh-personal-dev-workflow",
-  "version": "1.0.0",
-  "description": "Lean bilingual (EN/CN) personal development workflow skill for coding agents: one conductor + isolated workers + file-based memory + a verification loop, inside bounded autonomy; a six-step task-card cycle with numeric budgets and explicit stop conditions.",
+  "version": "2.0.0",
+  "description": "Executable personal development workflow skill for coding agents: a single coordinator compiles the user's goal into a task contract, dispatches isolated role sessions across OpenCode/Codex/AGY, runs real checks, reviews independently, and resumes from recorded evidence. Ships a dependency-free Node CLI relay (scripts/pdw.mjs).",
   "license": "MIT",
   "type": "commonjs",
   "repository": {
@@ -37,6 +37,7 @@
   "scripts": {
     "validate": "node scripts/validate-skills.mjs",
     "sync": "node scripts/sync-copies.mjs",
+    "test:pdw": "node skills/personal-dev-workflow/scripts/pdw.test.mjs",
     "test:runstate": "node tools/run-tests.mjs"
   },
   "publishConfig": {

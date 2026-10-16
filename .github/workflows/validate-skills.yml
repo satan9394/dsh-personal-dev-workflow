@@ -25,17 +25,16 @@ jobs:
           node-version: '20'
       - name: Validate SKILL.md frontmatter and references
         run: node scripts/validate-skills.mjs
-      - name: Run runstate CLI tests (Run/Mission budgets + gate)
+      - name: Run PDW relay tests (v2 skill)
+        run: node skills/personal-dev-workflow/scripts/pdw.test.mjs
+      - name: Run runstate CLI tests (v1.x controller, kept for the DSH budget gate)
         run: node tools/run-tests.mjs
       # Official Agent Skills reference validator, pinned to an immutable commit so
-      # the gate cannot move under the repo. Both skills must pass; a non-zero exit
-      # fails the job.
+      # the gate cannot move under the repo. A non-zero exit fails the job.
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
       - name: Install official Agent Skills reference validator (pinned commit)
         run: pip install "git+https://github.com/agentskills/agentskills@69ef37e9424c0a7ea9dd2293b559e43ec8176379#subdirectory=skills-ref"
-      - name: Validate the English skill with the official validator
+      - name: Validate the skill with the official validator
         run: skills-ref validate skills/personal-dev-workflow
-      - name: Validate the Chinese skill with the official validator
-        run: skills-ref validate skills/personal-dev-workflow-zh
