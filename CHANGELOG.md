@@ -20,7 +20,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow 
 - Follow current skill-creator: frontmatter only name/description; display metadata in agents/;
   runtime/reference/assets separation; no repository release notes or temporary backups in Skill.
 - Keep distribution 2.0.1 separate from research/runtime 1.3.2-local using `pdwSkillVersion`.
-- Regenerate plugin and SkillHub copies, update contributor/release guidance and CI gates.
+- **Ship the Skill only**: the DSH plugin bundle (`plugin/`), the SkillHub package (`dist/skillhub-pkg`) and `scripts/sync-copies.mjs` were removed on the user's instruction — a plugin is not a Skill. The validator, its tests, the CI wording and `package.json` `files`/`scripts` no longer mention a plugin, a dist package or a copy step, so canonical-vs-copy drift can no longer exist.
 - Preserve the pre-existing untracked backup under ignored `.pdw/migrations/research-1.3.2/`.
 
 ### Boundaries / upgrade

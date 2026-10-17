@@ -22,8 +22,9 @@ planning when a task needs it.
 This working tree prepares 2.0.1 locally; remote installation still follows the published Git state.
 
 The distribution now imports research Skill **1.3.2-local**, retaining the committed role-JSON recovery
-fix from `0e06aea`. Distribution versions (`package.json` and the plugin manifest) remain on the 2.x
-line; `pdwSkillVersion` records the research/runtime version without adding fields to Skill frontmatter.
+fix from `0e06aea`. The distribution version (`package.json`) stays on the 2.x line; `pdwSkillVersion`
+records the research/runtime version without adding fields to Skill frontmatter. **This repository ships
+the Skill only** — the DSH plugin bundle and the generated copies were removed on 2026-10-16.
 
 This update fixes ignored-root and explicit ignored-scope snapshots, truthful doctor model flags,
 Windows npm Codex native discovery, unsafe CLI prefixes and failed-coverage finalization. Coverage
@@ -32,7 +33,7 @@ binary/configuration readiness; authentication and provider routing require a sm
 Upgrades and old-state migration remain manual; retain task evidence and used budgets.
 
 Research and original experiments live in the separate research project. This repository is the
-Skill maintenance/distribution home; see [the import record](docs/evidence/research-1.3.2-import.json).
+Skill maintenance/distribution home; see [the import record](archive/docs/evidence/research-1.3.2-import.json).
 
 ## What v2.0.0 changes
 
@@ -65,8 +66,6 @@ npx skills add satan9394/dsh-personal-dev-workflow
 |---|---|
 | Manual copy (universal) | copy `skills/personal-dev-workflow/` into `<project>/.agents/skills/` — discovered by Codex, OpenCode, DSH and Antigravity |
 | Manual copy (Claude Code) | copy `skills/personal-dev-workflow/` into `~/.claude/skills/` or `<project>/.claude/skills/` |
-| DSH bundle plugin | `dsh plugin --profile web add link:<this repo>/plugin/dsh-personal-dev-workflow` |
-| GitHub Packages (npm) | `npm install @satan9394/dsh-personal-dev-workflow --registry=https://npm.pkg.github.com` — requires a GitHub token with `read:packages` |
 | Into an existing project | `node <skill>/scripts/pdw.mjs install --project <path>` — refuses to overwrite an existing skill of the same name |
 
 ## Driving it
@@ -121,31 +120,28 @@ Minimal contract (fields are documented in [`references/runtime.md`](skills/pers
 ## Repository layout
 
 ```
-dsh-personal-dev-workflow/
+personal-dev-workflow/
 ├── skills/personal-dev-workflow/      # THE skill (research 1.3.2-local): SKILL.md + references/runtime.md
 │                                      #   + agents/openai.yaml + assets/audit-task.json
 │                                      #   + scripts/{pdw.mjs, drivers.mjs, pdw.test.mjs, drivers.test.mjs}
-├── plugin/dsh-personal-dev-workflow/  # DSH bundle plugin — bundles the skill above (generated copy)
-├── dist/skillhub-pkg/                 # flat publish package for SkillHub (generated copy)
-├── scripts/validate-skills.mjs        # frontmatter + reference + copy + version-consistency checks
-├── scripts/sync-copies.mjs            # regenerate plugin/dist copies from skills/
-├── .github/workflows/                 # validate-skills.yml · publish-package.yml
-├── docs/ demos/ tools/ taskcard-cli.js  # v1.x / v0.5.x line, kept deliberately (see below)
-└── plugin/dsh-budget-gate/            # v0.5.x host gate, kept deliberately (see below)
+├── scripts/validate-skills.mjs        # frontmatter + reference + version-consistency checks
+├── .github/workflows/                 # validate-skills.yml
+├── archive/                           # v1.x / v0.5.x legacy: tools, demos, docs, taskcard-cli.js
+└── AGENTS.md                          # repository rules (Skill-only scope)
 ```
 
-`skills/` is the single source of truth; the plugin bundle and the `dist/` package are **generated
-copies** and a CI check fails on any byte difference. Run `node scripts/sync-copies.mjs` after editing the skill.
+`skills/` is the single source of truth and the **only deliverable**: there is no plugin bundle, no
+`dist/` package and no copy step — a plugin is not a Skill. Editing the Skill is all that is needed.
 
 ## Legacy lines (kept deliberately)
 
 | Artifact | Line | Status |
 |---|---|---|
 | tag `v1.0.0`, `skills/personal-dev-workflow-zh` at that tag | 1.0.0 | the retired en+zh twin, six-step task-card loop, JSON state controller (`scripts/runstate.js`), 4 eval suites, adapters |
-| `tools/runstate.js` + `tools/run-tests.mjs` | 0.5.x | Markdown `RUN_STATE.md` controller and its 43-case suite; still exercised by CI |
-| `plugin/dsh-budget-gate/` | 0.5.x | host-level budget gate, kept byte-identical to the deployed copy for drift checking |
-| `docs/`, `demos/` | 0.5.x – 1.0.0 | audit notes, case study, runnable evidence, static visualizations |
-| `taskcard-cli.js` | 1.x | zero-dependency task-card CLI for a `tasks/` board — still usable on its own |
+| `archive/tools/runstate.js` + `archive/tools/run-tests.mjs` | 0.5.x | Markdown `RUN_STATE.md` controller and its 43-case suite; still exercised by CI |
+| `plugin/dsh-budget-gate/` (removed 2026-10-16) | 0.5.x | host-level budget gate; the in-repo copy went with the plugin cleanup — recover it from tag `v2.0.0` if the drift comparison is ever needed again |
+| `archive/docs/`, `archive/demos/` | 0.5.x – 1.0.0 | audit notes, case study, runnable evidence, static visualizations |
+| `archive/taskcard-cli.js` | 1.x | zero-dependency task-card CLI for a `tasks/` board — still usable on its own |
 
 None of these are loaded by the v2.0.0 skill. They are kept so the previous designs stay verifiable
 rather than described from memory.
@@ -164,14 +160,14 @@ This repo practices what the skill preaches:
   including ignored Git roots/scope, evidence freshness, budgets, locks, cancellation and failure
   reporting. Evidence stays in this checkout's `.pdw/test-runs/` (or the installed project's `.pdw/`).
   These are real local fixture processes, not live provider verification.
-- `node tools/run-tests.mjs` — the retained v0.5.x controller suite; skipped cases remain explicit.
+- `node archive/tools/run-tests.mjs` — the retained v0.5.x controller suite; skipped cases remain explicit.
 - CI additionally runs the **official Agent Skills validator** (`skills-ref validate`) pinned to an
   immutable commit, on a runner with `PYTHONUTF8=1` because that validator reads files with the platform
   default encoding.
 - `npx skills add satan9394/dsh-personal-dev-workflow --list` must discover the skill.
 - v1.0.0 was exercised end-to-end on real projects (a task-card CLI, and a three-run bounded-autonomy
-  test under the v0.5.x model): [`docs/case-study-bounded-autonomy.md`](docs/case-study-bounded-autonomy.md)
-  · runnable evidence: [`docs/evidence/runstate-cli/`](docs/evidence/runstate-cli/).
+  test under the v0.5.x model): [`archive/docs/case-study-bounded-autonomy.md`](archive/docs/case-study-bounded-autonomy.md)
+  · runnable evidence: [`archive/docs/evidence/runstate-cli/`](archive/docs/evidence/runstate-cli/).
 
 ## Releasing
 

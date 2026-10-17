@@ -2,19 +2,19 @@
 
 This repository maintains and distributes the iterated Skill. Workflow research and original evidence live in `E:\Code_file\Projects\人机协作开发工作流研究`.
 
-> **2026-10-16 交接**：本机另一会话（OpenCode）留下留意清单与归一化建议 → **`HANDOFF-20261016-opencode.md`**（含"临时状态·暂停副本生成"、31 项未提交改动的归类建议、`.pdw` 悬空软链噪音、机器侧使用位现状）。**做统一化清洗前先读它。**
+> **交接**：最新一份是 **`HANDOFF-20261017-opencode.md`**（迁移/清场/落位后的状态快照、待办与踩坑）；上一份 `HANDOFF-20261016-opencode.md` 保留可查（含未提交改动的归类建议、`.pdw` 悬空软链噪音、机器侧使用位现状）。插件与派生副本已移除（`plugin/`、`dist/`、`sync-copies.mjs`、npm 发布工作流），legacy 已整批归档到 `archive/`；**开工先读最新那份。**
 
-- Edit only `skills/personal-dev-workflow/` as the canonical Skill; regenerate plugin/dist copies with `node scripts/sync-copies.mjs`. **⚠ 2026-10-16 起暂停生成副本——见文末「临时状态」。**
+- 落位与分发（把 Skill 挂到 cc/oc/dsh/agy 的全局位、升级项目里的副本、与研究发布包的对照口径与验收清单）：按 **`DEPLOYMENT.md`** 执行，不要每次重新讨论口径。方针依据：`E:\Code_file\Claude_code\Notes\DECISIONS.md` 的 D-0081（仓库=开发位、库=挂载开关、全局=受管链接、项目=按需复制）。
+
+- Edit only `skills/personal-dev-workflow/` as the canonical Skill. **This repository ships the Skill only**: the DSH plugin bundle and the generated copies were removed on 2026-10-16 on the user's instruction (a plugin is not a Skill), and `scripts/sync-copies.mjs` is retired. Do not reintroduce a plugin directory or a copy step.
 - Follow skill-creator: frontmatter contains only name/description; display metadata goes in agents/openai.yaml; runtime details in references/; runnable tools in scripts/; templates in assets/. Keep release notes and repository evidence outside the Skill.
-- `package.json.version` and the plugin version identify the distribution. `pdwSkillVersion` and the Skill/runtime text identify the imported research version. Preserve documented downstream fixes.
-- Verify with `node scripts/validate-skills.mjs`, `node --test scripts/validate-skills.test.mjs`, `node --test skills/personal-dev-workflow/scripts/drivers.test.mjs`, `node skills/personal-dev-workflow/scripts/pdw.test.mjs`, and `node tools/run-tests.mjs`. Fixture passes do not prove live authentication or provider routing.
-- Keep `.pdw/` evidence/backups and legacy docs/tools intact. Do not copy transient backups into the Skill. No automatic commit, push, publish, release, global configuration changes or permanent deletion.
+- `package.json.version` identifies the distribution. `pdwSkillVersion` and the Skill/runtime text identify the imported research version. Preserve documented downstream fixes.
+- Verify with `node scripts/validate-skills.mjs`, `node --test scripts/validate-skills.test.mjs`, `node --test skills/personal-dev-workflow/scripts/drivers.test.mjs`, `node skills/personal-dev-workflow/scripts/pdw.test.mjs`, and `node archive/tools/run-tests.mjs`. Fixture passes do not prove live authentication or provider routing.
+- Keep `.pdw/` evidence/backups intact and leave the archived legacy material under `archive/` where it is; do not copy it back into the live tree. Do not copy transient backups into the Skill. No automatic commit, push, publish, release, global configuration changes or permanent deletion.
 
-## 临时状态 / Temporary hold（2026-10-16 起，用户指令）
+## 产物范围 / Scope（2026-10-16，用户指令）
 
-**Do not generate or re-sync the plugin/dist skill copies until the user lifts this hold.**
-
-- **暂停什么**：不跑 `node scripts/sync-copies.mjs`；也不手工把 `plugin/dsh-personal-dev-workflow/skills/personal-dev-workflow/` 与 `dist/skillhub-pkg/` 跟 `skills/personal-dev-workflow/` 对齐。
-- **已知后果（预期状态，不是待修的 bug）**：副本会与 canonical 漂移，`scripts/validate-skills.mjs` 的"逐字节一致"检查（以及 CI 里同一条闸门）会报 FAIL。**暂停期间不要为了让它变绿而去生成副本**——要么接受它报红并说明原因，要么等解除后一次性补齐。
-- **不受影响**：Skill 本体 `skills/personal-dev-workflow/`，以及 agent 实际使用的两份——skills-manager 库 `~/.skills-manager/skills/personal-dev-workflow` 与 `~/.claude/skills/personal-dev-workflow`（Junction）——读的都是 canonical，不读这些副本。
-- **解除方式**：由用户明示恢复；恢复时跑 `node scripts/sync-copies.mjs` 再跑 `node scripts/validate-skills.mjs` 收口。
+- **本仓库只产出 Skill**：`skills/personal-dev-workflow/` 是唯一交付物。**不做 DSH 插件、不产任何派生副本**——插件 ≠ Skill。
+- 2026-10-16 已移除：`plugin/`（含 `dsh-personal-dev-workflow` 插件与 `dsh-budget-gate`）、`dist/skillhub-pkg`、`scripts/sync-copies.mjs`；`validate-skills.mjs` 的副本校验与插件版本一致性校验、`validate-skills.test.mjs` 里对应的两个用例、CI 里那句"packaging"措辞一并去掉；`package.json` 的 `files` / `scripts` 不再提 plugin、dist、sync。
+- 机理：**不再有副本，就不存在"canonical 与副本漂移"**，也不需要"暂停生成副本"这种临时状态。
+- agent 侧不受影响：Claude / OpenCode 读的是 skills-manager 库里的那份（`~/.skills-manager/skills/personal-dev-workflow`），由 `skills update` 从本仓库导入。

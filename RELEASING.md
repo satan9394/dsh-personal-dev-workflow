@@ -23,7 +23,7 @@ impact or migration.
 ## Versioning
 
 - Follow [SemVer](https://semver.org/).
-- Keep root and plugin `package.json.version` in sync. Record the imported research version in root `pdwSkillVersion`; it must match the Skill body/runtime. Frontmatter contains only name/description.
+- Bump root `package.json.version`. Record the imported research version in root `pdwSkillVersion`; it must match the Skill body/runtime. Frontmatter contains only name/description.
 - `scripts/validate-skills.mjs` enforces that consistency; its failure blocks the release.
 
 ## Steps
@@ -31,14 +31,13 @@ impact or migration.
 ```sh
 # 0. pick the new version, e.g. VERSION=1.0.1
 # 1. update distribution manifests; update pdwSkillVersion only when importing a new research runtime
-node scripts/sync-copies.mjs          # scripts/sync-copies.mjs
 # 2. add the CHANGELOG.md entry
 # 3. verify locally
 node scripts/validate-skills.mjs
 node --test scripts/validate-skills.test.mjs
 node --test skills/personal-dev-workflow/scripts/drivers.test.mjs
 node skills/personal-dev-workflow/scripts/pdw.test.mjs
-node tools/run-tests.mjs
+node archive/tools/run-tests.mjs
 # 4. commit, then tag and push
 git commit -am "release: v1.0.1"
 git tag v1.0.1
@@ -50,9 +49,6 @@ gh release create v1.0.1 --generate-notes --notes-start-tag v1.0.0 --title "v1.0
 ## Scope and current limitations
 
 - **A release here means a GitHub tag + Release** (and the install path `npx skills add satan9394/dsh-personal-dev-workflow`).
-- **npm / GitHub Packages publishing is currently unavailable.** `publish-package.yml` is `workflow_dispatch`-only
-  because publishing fails with `npm error 403 … permission_denied: write_package` — the package
-  `@satan9394/dsh-personal-dev-workflow` appears to still be linked to a previously deleted repository.
-  Restore it by relinking / deleting that package (needs package admin), then run the workflow manually.
+- **No npm publishing.** The package workflow (`publish-package.yml`) and the `publishConfig` registry entry were removed on 2026-10-16 on the user's instruction — this repository ships the Skill only, and nothing is published to npm or GitHub Packages.
 - Do the release from a machine whose git identity is `satan9394 <satan9394@users.noreply.github.com>`
   so no personal email lands in commit metadata.

@@ -2,7 +2,9 @@
 
 > 出具方：OpenCode（本机另一会话）；接收方：在本仓库工作的 Codex 会话。
 > 目的：把"仓库外我动过的东西"和"我看到的乱点"一次讲清，供你做统一化清洗与适配。
-> 本文件只记录与建议，**不含任何我擅自做的仓库内容改动**（我在仓库里唯一动过的是 `AGENTS.md` 末尾那节「临时状态」，那是用户指令）。
+> 本文件只记录与建议，**不含任何我擅自做的仓库内容改动**（我在仓库里唯一动过的是 `AGENTS.md` 末尾的产物范围一节，那是用户指令）。
+
+> **2026-10-17 更新**：本文写于"插件/副本移除"**之前**。2026-10-16 晚已按用户指令移除 `plugin/`、`dist/skillhub-pkg`、`scripts/sync-copies.mjs`（以及 npm 发布工作流），并把 `tools/`、`demos/`、`docs/`、`taskcard-cli.js` 整批归档到 `archive/`；仓库现在只产出 Skill（见 `AGENTS.md` 的「产物范围 / Scope」）。因此第三节第 4、6 条与第五节第 6 步已不适用；**第 1、2、3、5 条（未提交改动、发布落后于 1.3.2、`AGENTS.md` 曾未跟踪、`.pdw` 悬空软链噪音）仍然有效**。另：本目录已改名为 `personal-dev-workflow`（2026-10-17）。
 
 ## 一、仓库现状快照（2026-10-16 晚，只读取得）
 
@@ -31,9 +33,9 @@
 | 1 | **31 项改动 + 1 个未推提交全悬着** | 见第一节 | 用户拍板：哪些进版本库、分几个提交、是否推 `main` |
 | 2 | **发布与仓库不一致** | 已发布 `v2.0.0` 不含 `1.3.2-local`（`0e06aea` 是修复，工作区还有 25 项） | 决定是否发 `v2.0.1`（`package.json` 已写 2.0.1）；发版说明按 `RELEASING.md` 的窗口要求写 |
 | 3 | **`AGENTS.md` 本身未跟踪** | `?? AGENTS.md` | 尽早 `git add` 进版本库——它是治理文件，别只活在本地磁盘 |
-| 4 | **副本生成的临时暂停** | `AGENTS.md` 文末「临时状态」 | 用户明示前：**不跑 `sync-copies.mjs`、不手工补同步**；接受 `validate-skills.mjs` 的"逐字节一致"检查在 canonical 下次改动后报 FAIL，别为了变绿去生成 |
+| 4 | ~~副本生成的临时暂停~~ **已解决** | `AGENTS.md` 的「产物范围」 | 2026-10-16 已按用户指令移除插件与全部副本（`plugin/`、`dist/`、`sync-copies.mjs`、npm 发布工作流）+ 对应校验与用例；legacy 整批归档到 `archive/` ⇒ 漂移问题从根上消失 |
 | 5 | **`.pdw/` 只增不减 + 悬空软链** | 5.1 MB / 4153 文件；`symlink-scope/dangling` | 归入清洗：① 清悬空软链，消掉 `git status` 噪音；② 决定 `test-runs/` 是否只留最近若干次（规则要求"保留 `.pdw/` 证据"，所以只建议裁剪、不整目录删） |
-| 6 | **v1.x 遗留物在仓库里与 v2 并列** | `tools/`（v0.5.x 控制器 + 43 用例）、`demos/`×3、`docs/`（审计/案例/证据）、`taskcard-cli.js`、`plugin/dsh-budget-gate/` | 规则要求"legacy docs/tools intact"⇒ 建议**只做标注**：在 `README` 用一节讲清"哪些是 v2 现行、哪些是 v1.x 遗产、各自谁在用"（本机 DSH 那个已停用的预算闸门仍指向 `tools/runstate.js`） |
+| 6 | **v1.x 遗留物曾与 v2 并列**（已归档） | 2026-10-17 已把 `tools/`（v0.5.x 控制器 + 43 用例）、`demos/`×3、`docs/`、`taskcard-cli.js` 整批移到仓库的 `archive/`；本机 DSH 那个已停用的预算闸门仍指向 `archive/tools/runstate.js` |
 | 7 | **同一份 skill 在机器上有 9 处** | 仓库（canonical）、库、`.claude` 入口、`.dsh` 入口、四个项目 `.agents/skills/` | 项目级按用户方针"长期项目复制、小项目不复制"；机器侧已由库+链接收口，**项目那份归各项目自己变**（用户已安排） |
 | 8 | **死引用** | 归档脚本 `sync-personal-dev-workflow.ps1` 的旧目标里含已不存在的 `Composable_Agent_Harness` | 该脚本只对"往项目推副本"还有用；若启用，先把目标表里那条死路径删掉 |
 
@@ -60,7 +62,7 @@ node scripts/validate-skills.mjs
 node --test scripts/validate-skills.test.mjs
 node --test skills/personal-dev-workflow/scripts/drivers.test.mjs
 node skills/personal-dev-workflow/scripts/pdw.test.mjs
-node tools/run-tests.mjs
+node archive/tools/run-tests.mjs
 ```
 
 我 2026-10-16 晚跑过一轮（**当前工作区**）：`validate-skills` 全绿（源版本 1.3.2-local 对齐 `pdwSkillVersion`、发布号 2.0.1 两处一致）；两个 `--test` exit 0；`pdw.test` **32 通过 / 0 失败**；`run-tests` 42/43（1 条条件跳过）。**fixture 通过不等于真机登录与供应商路由已验证。**
