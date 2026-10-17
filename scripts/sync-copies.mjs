@@ -4,7 +4,7 @@
  *
  *   canonical: skills/<name>/...                          (single source of truth)
  *   plugin:    plugin/dsh-personal-dev-workflow/skills/<name>/...
- *   dist:      dist/skillhub-pkg-en|zh/...                (flat: files directly inside)
+ *   dist:      dist/skillhub-pkg/...                (flat: files directly inside)
  *
  * Overwrites files in the copies. Extra files found in a copy that no longer
  * exist in the canonical skill are REPORTED (not deleted) so they can be

@@ -1,55 +1,8 @@
 #!/usr/bin/env node
-/**
- * Dependency-free validator for this repository.
- *
- * A. For every directory under skills/ (the single source of truth):
- *   1. SKILL.md exists and opens with a YAML frontmatter block.
- *   2. `name` is present and matches the folder name.
- *   3. `description` is present and non-empty; a single-line value containing
- *      ": " must be quoted (unquoted scalars break strict YAML parsers).
- *   4. Every `references/<file>` mentioned in the body exists on disk.
- *   5. The frontmatter `metadata.version` equals the repository root
- *      `package.json` version, keeping the release number the skill declares one
- *      number for the whole repository: the skill, the plugin bundle, the dist
- *      packages and the npm package never drift. A2/A3 below check the same
- *      number in the other manifests.
- *
- * A.6 Agent Skills specification checks — a **supplement to, not an equivalent
- *     of,** the official `skills-ref validate`, which CI runs as well. The two
- *     gates disagree in three measured places: a `compatibility` value over 500
- *     characters and a quoted empty `description: ""` pass here but are rejected
- *     by the official validator (false negatives), while an unquoted `description`
- *     containing prose `[` / `{` (e.g. `Use [this] notation`) is rejected here but
- *     accepted there (false positive). The official validator in CI is the
- *     backstop for these differences. Each specification-check failure below carries
- *     a stable machine-readable `[spec:<id>]` tag so a fixture can prove which
- *     check fired (the pre-existing rules A.1-A.5 and the copy checks in B keep
- *     their original untagged messages):
- *       spec:frontmatter-fields      frontmatter top-level keys must be a subset
- *                                    of name/description/license/compatibility/
- *                                    metadata/allowed-tools.
- *       spec:no-flow-collections     no YAML flow collections (`[a, b]` / `{k: v}`)
- *                                    anywhere in the frontmatter — the official
- *                                    parser rejects them outright.
- *       spec:name-format             `name` is 1-64 chars, only [a-z0-9-], no
- *                                    leading/trailing hyphen, no `--`.
- *       spec:description-length      `description` is at most 1024 characters.
- *       spec:reference-target        every relative path referenced from the body
- *                                    (bare `references/x`, `references.<x>/`,
- *                                    and markdown `[text](target)`) resolves.
- *       spec:metadata-values         every `metadata` value is a string scalar
- *                                    (no arrays, no nested mappings).
- *
- * A2. Release-number consistency: every canonical `SKILL.md` frontmatter
- *     `metadata.version` **and** `plugin/dsh-personal-dev-workflow/package.json`
- *     `version` must equal the root `package.json` version. A mismatch is a
- *     FAIL and exits non-zero, naming the manifest that drifted.
- *
- * B. Every packaged copy (plugin bundle, dist publish packages) must match the
- *    canonical skill byte-for-byte: no missing files, no modified files, no
- *    extra files. Run `node scripts/sync-copies.mjs` to regenerate copies.
- *
- * Exit code 0 = all good, 1 = at least one problem (printed).
+/** Validate the skill-creator layout, declared source version and generated copies.
+ * The distribution follows SemVer in package.json/plugin; pdwSkillVersion names
+ * the imported research runtime. Skill frontmatter contains name/description only.
+ * This local check supplements the official Agent Skills validator in CI.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
@@ -73,7 +26,6 @@ const SPEC_CHECKS = {
   nameFormat: 'spec:name-format',
   descriptionLength: 'spec:description-length',
   referenceTarget: 'spec:reference-target',
-  metadataValues: 'spec:metadata-values',
 };
 
 /** Read a package.json `version`; any problem is recorded against `scope` and returns null. */
@@ -130,59 +82,12 @@ function parseEntry(line) {
   };
 }
 
-/** A value is a single-line YAML string scalar (quoted, or a plain scalar on one line). */
-function isInlineStringValue(rawValue) {
-  if (rawValue === '') return false;
-  if (/^"/.test(rawValue)) return /^"(?:[^"\\]|\\.)*"\s*(?:#.*)?$/.test(rawValue);
-  if (/^'/.test(rawValue)) return /^'(?:[^']|'')*'\s*(?:#.*)?$/.test(rawValue);
-  return /^[^"'[\]{}|>&*!%@`,#]+$/.test(rawValue);
-}
-
 /**
  * Strip quoted strings (single/double, with escapes) before scanning for YAML flow
  * collections: a `[` or `{` inside a description is prose, not a flow collection.
  */
 function stripQuotedSpans(text) {
   return text.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^']|'')*'/g, "''");
-}
-
-/**
- * Entries of the top-level `metadata:` block (nested keys included, so a nested
- * mapping can be told apart from a string value).
- */
-function collectMetadataEntries(frontmatter) {
-  const start = frontmatter.findIndex((line) => /^metadata:\s*$/.test(line));
-  if (start < 0) return [];
-  const entries = [];
-  for (let i = start + 1; i < frontmatter.length; i += 1) {
-    if (frontmatter[i].trim() === '') continue;
-    const entry = parseEntry(frontmatter[i]);
-    if (!entry) break;
-    if (entry.indent === 0) break;
-    entries.push(entry);
-  }
-  return entries;
-}
-
-/** 6. `metadata` values: the spec mandates a string -> string mapping. */
-function checkMetadataValues(skill, metadataEntries) {
-  for (let i = 0; i < metadataEntries.length; i += 1) {
-    const entry = metadataEntries[i];
-    const next = metadataEntries[i + 1];
-    if (entry.rawValue === '' && next && next.indent > entry.indent) {
-      specFail(
-        SPEC_CHECKS.metadataValues,
-        skill,
-        `metadata value "${entry.key}" is a nested mapping; metadata values must be string scalars`,
-      );
-    } else if (!isInlineStringValue(entry.rawValue)) {
-      specFail(
-        SPEC_CHECKS.metadataValues,
-        skill,
-        `metadata value "${entry.key}" is not a string scalar; metadata values must be string scalars`,
-      );
-    }
-  }
 }
 
 /**
@@ -202,7 +107,7 @@ function checkBodyReferences(skill, body) {
     targets.add(target);
   }
   for (const target of targets) {
-    const clean = target.replace(/[.,;:]+$/, '');
+    const clean = decodeURIComponent(target.split('#', 1)[0]).replace(/[.,;:]+$/, '');
     if (existsSync(join(skillsDir, skill, clean))) continue;
     if (!clean.endsWith('/') && existsSync(join(skillsDir, skill, clean, '.'))) continue;
     specFail(
@@ -309,29 +214,15 @@ function checkSkill(skill) {
   // 4. referenced files
   checkBodyReferences(skill, body);
 
-  // 5. version (metadata.version; compared against the root package.json by the caller)
-  const metadataEntries = collectMetadataEntries(frontmatter);
-  checkMetadataValues(skill, metadataEntries);
-
-  const metadataIndex = frontmatter.findIndex((l) => /^metadata:\s*$/.test(l));
-  const metadataBlock = [];
-  if (metadataIndex >= 0) {
-    for (let i = metadataIndex + 1; i < frontmatter.length; i += 1) {
-      if (!/^\s+\S/.test(frontmatter[i])) break;
-      metadataBlock.push(frontmatter[i]);
-    }
-  }
-  const versionLine = metadataBlock.find((l) => /^\s+version:\s*\S/.test(l));
-  if (!versionLine) {
-    fail(skill, 'frontmatter "metadata" is missing a non-empty "version"');
-    return null;
-  }
-  return versionLine.replace(/^\s*version:\s*/, '').trim().replace(/^["']|["']$/g, '');
+  // Version belongs in the body, outside the trigger metadata.
+  const version = /^版本：([^；\s]+)；/m.exec(body)?.[1];
+  if (!version) fail(skill, 'body is missing the declared version');
+  return version ?? null;
 }
 
-/** Whitelist the frontmatter's top-level keys exactly as the official validator does. */
+/** Apply the current skill-creator frontmatter convention. */
 function checkFrontmatterFields(skill, frontmatter) {
-  const allowed = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools']);
+  const allowed = new Set(['name', 'description']);
   const present = [...new Set(frontmatter.map(parseEntry).filter(Boolean).filter((e) => e.topLevel).map((e) => e.key))];
   const unexpected = present.filter((key) => !allowed.has(key)).sort();
   if (unexpected.length > 0) {
@@ -396,6 +287,9 @@ function checkCopy(label, copyDir, skill) {
 
 // --- A. canonical skills ---
 const rootVersion = readRootVersion();
+const sourceVersion = JSON.parse(readFileSync(rootPackageFile, 'utf8')).pdwSkillVersion;
+if (typeof sourceVersion !== 'string' || !sourceVersion.trim()) fail('package.json', 'pdwSkillVersion must identify the research runtime');
+
 
 for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
@@ -426,14 +320,22 @@ for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
   }
 }
 
-// --- A2. version consistency (skill frontmatter == root package.json) ---
+// --- A2. source version consistency (body/runtime == pdwSkillVersion) ---
 if (rootVersion !== null) {
   for (const [skill, version] of skillVersions) {
-    if (version !== rootVersion) {
+    if (version !== sourceVersion) {
       fail(
         skill,
-        `frontmatter "metadata.version" (${version}) must equal the root package.json version (${rootVersion})`,
+        `body version (${version}) must equal package.json pdwSkillVersion (${sourceVersion})`,
       );
+    }
+    for (const [relativePath, pattern, expected, label] of [
+      ['references/runtime.md', /^# PDW ([^\s]+)/m, typeof sourceVersion === 'string' ? sourceVersion.replace(/-local$/, '') : null, 'runtime heading'],
+      ['scripts/pdw.mjs', /^const version = '([^']+)';/m, sourceVersion, 'runtime executable'],
+    ]) {
+      const file = join(skillsDir, skill, relativePath);
+      const declared = existsSync(file) ? pattern.exec(readFileSync(file, 'utf8'))?.[1] : null;
+      if (!declared || declared !== expected) fail(skill, `${label} version (${declared ?? 'missing'}) must match pdwSkillVersion (${sourceVersion})`);
     }
   }
 }
@@ -477,9 +379,9 @@ for (const target of copyTargets) {
 
 // --- report ---
 for (const [skill, version] of skillVersions) {
-  const matches = rootVersion !== null && version === rootVersion;
+  const matches = version === sourceVersion;
   console.log(
-    `${matches ? 'ok  ' : 'warn'} canonical ${skill} (version ${version} vs package.json ${rootVersion ?? '?'})`,
+    `${matches ? 'ok  ' : 'warn'} canonical ${skill} (version ${version} vs pdwSkillVersion ${sourceVersion ?? '?'})`,
   );
 }
 for (const problem of failures) console.error(`FAIL ${problem}`);
@@ -492,7 +394,7 @@ if (failures.length > 0) {
 }
 console.log(`\nAll ${checked.length} canonical skill(s) and ${copyTargets.length} packaged copy set(s) valid.`);
 if (rootVersion !== null) {
-  console.log(`Version consistency: every canonical SKILL.md declares ${rootVersion}, matching the root package.json.`);
+  console.log(`Source version: every canonical SKILL.md declares ${sourceVersion}, matching pdwSkillVersion.`);
   if (pluginVersion !== null && pluginVersion === rootVersion) {
     console.log(`Version consistency: ${pluginPackageScope} declares ${pluginVersion}, matching the root package.json.`);
   }

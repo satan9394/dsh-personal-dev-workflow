@@ -20,3 +20,6 @@ id_ed25519
 .npmrc.local
 .pypirc
 secrets.json
+
+# Local task evidence and recoverable migration backups
+.pdw/

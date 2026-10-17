@@ -25,6 +25,10 @@ jobs:
           node-version: '20'
       - name: Validate SKILL.md frontmatter and references
         run: node scripts/validate-skills.mjs
+      - name: Test packaging and frontmatter validation
+        run: node --test scripts/validate-skills.test.mjs
+      - name: Test native discovery, policies and role-result parsing
+        run: node --test skills/personal-dev-workflow/scripts/drivers.test.mjs
       - name: Run PDW relay tests (v2 skill)
         run: node skills/personal-dev-workflow/scripts/pdw.test.mjs
       - name: Run runstate CLI tests (v1.x controller, kept for the DSH budget gate)

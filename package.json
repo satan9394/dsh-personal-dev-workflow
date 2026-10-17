@@ -1,6 +1,6 @@
 {
   "name": "@satan9394/dsh-personal-dev-workflow",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Executable personal development workflow skill for coding agents: a single coordinator compiles the user's goal into a task contract, dispatches isolated role sessions across OpenCode/Codex/AGY, runs real checks, reviews independently, and resumes from recorded evidence. Ships a dependency-free Node CLI relay (scripts/pdw.mjs).",
   "license": "MIT",
   "type": "commonjs",
@@ -20,8 +20,7 @@
     "cursor",
     "dsh",
     "workflow",
-    "task-card",
-    "bilingual"
+    "task-card"
   ],
   "files": [
     "skills/",
@@ -38,12 +37,15 @@
     "validate": "node scripts/validate-skills.mjs",
     "sync": "node scripts/sync-copies.mjs",
     "test:pdw": "node skills/personal-dev-workflow/scripts/pdw.test.mjs",
-    "test:runstate": "node tools/run-tests.mjs"
+    "test:runstate": "node tools/run-tests.mjs",
+    "test:drivers": "node --test skills/personal-dev-workflow/scripts/drivers.test.mjs",
+    "test:packaging": "node --test scripts/validate-skills.test.mjs"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "pdwSkillVersion": "1.3.2-local"
 }
