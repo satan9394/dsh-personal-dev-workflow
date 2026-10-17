@@ -2,8 +2,8 @@
 
 > 这是**当前状态快照 + 待办 + 踩坑**，写给下一个会话（人或 agent）。
 > 开工顺序：先读仓库根 `AGENTS.md`（治理规则）→ 再读本文件 → 跑一遍文末「开工自检」。
-> 本文件只记录事实，不代表已提交：仓库里 `git status --porcelain` **78 项**（`-uall` 口径 118 项）改动**仍未提交**（见第 4 节）。
-> 2026-10-17 晚又做了一轮"落位与分发"专项（把 skill 铺到四个 agent、升级三份项目副本、给 remote-job-aggregator 首次装入），见 §2.7；本文件与之相关的段落已同步刷新。
+> 本文件只记录事实。2026-10-17 晚状态：那批未提交改动**已由两次提交收口并推送到 `origin/main`**，工作区干净（见第 4 节，已从"待办"变为"已完成"）。
+> 同日晚还做了一轮"落位与分发"专项（把 skill 铺到四个 agent、升级三份项目副本、给 remote-job-aggregator 首次装入），见 §2.7；本文件与之相关的段落已同步刷新。
 
 ## 1. 一句话现状
 
@@ -94,8 +94,8 @@ personal-dev-workflow/
 
 ### 3.3 Git
 
-- `HEAD = 9831739`，**领先 `origin/main` 4 个提交**，落后 0；分支只有 `main`；无 stash。
-- 工作区（2026-10-17 晚实测）：`git status --porcelain` **78 项**（`-uall` 口径 **118 项**）；未跟踪顶层三项 = `DEPLOYMENT.md`、`HANDOFF-20261017-opencode.md`、`archive/`；那 66 个删除就是"移动/移除"，提交时 git 会认成改名。
+- `HEAD = c22965e`（2026-10-17 晚已推送），与 `origin/main` **同步（0/0）**；分支只有 `main`；无 stash。
+- 工作区**干净**（`git status --porcelain` 无输出）：那批 78 项（`-uall` 118 项）未提交改动已由 `67b13ca`（`build!`）与 `c22965e`（`docs`）两次提交收口并推送；`git status` 不再列任何未跟踪顶层项。
 
 ### 3.4 验证（本文件写就时全绿）
 
@@ -109,9 +109,10 @@ personal-dev-workflow/
 
 > fixture 通过 ≠ 真机登录/供应商路由已验证。
 
-## 4. 未提交的这批改动怎么收（下一会话第一件事）
+## 4. 那批改动怎么收（**已完成 2026-10-17 晚**）
 
-建议分成 2 个提交（**需用户授权；本仓规则禁止自动提交/推送**）：
+已按下面这个拆法执行完并推送（`67b13ca` + `c22965e`，远端 `9d530b6..c22965e`，CI run `39038915821` **success**）。
+留档备查：**发布（tag / GitHub Release / npm）仍未授权**，需要时按 `RELEASING.md` 走。
 
 ```sh
 # 提交一：只保留 Skill（删插件/副本/npm + legacy 归档 + 校验与 CI 跟随）
@@ -127,7 +128,7 @@ git commit -m "build!: ship the Skill only — drop plugin bundle, generated cop
 
 ## 5. 待办 / 未决
 
-1. **提交 + 推送 + 是否发 v2.0.1**（见第 4 节）——**仍未授权**，本轮未提交。
+1. ~~提交 + 推送~~ **已完成（2026-10-17 晚）**：`67b13ca`（build!）、`c22965e`（docs）已推送到 `origin/main`，CI `39038915821` success。**是否发 `v2.0.1` 仍未授权**（tag / GitHub Release / npm 一律未动）。
 2. ~~dsh 那份还是 2.0.0 真副本~~ **已完成（2026-10-17）**：换成 Junction → 库，旧副本备份后进回收站。
 3. ~~Antigravity 未挂载~~ **已完成（2026-10-17）**：已 `skills deploy --agent antigravity`。**客户端层仍未实测**（用户决定本轮不测，属已知未验项，不是已验证）。
 4. **`.pdw/` 噪音**：现约 9819 文件 / 11.2 MB，含**悬空 Junction**（`symlink-scope/dangling` 等）。清洗建议：只清悬空链接、按需裁剪 `test-runs/`（规则要求保留 `.pdw/` 证据）。
@@ -166,6 +167,7 @@ node --test scripts/validate-skills.test.mjs
 node --test skills/personal-dev-workflow/scripts/drivers.test.mjs
 node skills/personal-dev-workflow/scripts/pdw.test.mjs
 node archive/tools/run-tests.mjs
+& "$env:USERPROFILE\.skills-manager\bin\skills-manager-cli.exe" skills status personal-dev-workflow
 ```
 
 若 `validate-skills.test` / `drivers.test` 报错，先看是不是有人把 `archive/` 里的东西搬回顶层（`AGENTS.md` 明确要求留在 `archive/`）。
