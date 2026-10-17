@@ -24,25 +24,17 @@
   ],
   "files": [
     "skills/",
-    "plugin/",
-    "dist/",
     "scripts/",
-    "tools/",
-    "taskcard-cli.js",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
   "scripts": {
     "validate": "node scripts/validate-skills.mjs",
-    "sync": "node scripts/sync-copies.mjs",
     "test:pdw": "node skills/personal-dev-workflow/scripts/pdw.test.mjs",
-    "test:runstate": "node tools/run-tests.mjs",
+    "test:runstate": "node archive/tools/run-tests.mjs",
     "test:drivers": "node --test skills/personal-dev-workflow/scripts/drivers.test.mjs",
     "test:packaging": "node --test scripts/validate-skills.test.mjs"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   },
   "engines": {
     "node": ">=18"

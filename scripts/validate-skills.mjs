@@ -1,19 +1,17 @@
 #!/usr/bin/env node
-/** Validate the skill-creator layout, declared source version and generated copies.
- * The distribution follows SemVer in package.json/plugin; pdwSkillVersion names
+/** Validate the skill-creator layout and the declared source version.
+ * The distribution follows SemVer in package.json; pdwSkillVersion names
  * the imported research runtime. Skill frontmatter contains name/description only.
+ * This repository ships the Skill only — no plugin bundle and no generated copies.
  * This local check supplements the official Agent Skills validator in CI.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skillsDir = join(repoRoot, 'skills');
 const rootPackageFile = join(repoRoot, 'package.json');
-/** The DSH bundle plugin's manifest — a second place the release number is written. */
-const pluginPackageFile = join(repoRoot, 'plugin', 'dsh-personal-dev-workflow', 'package.json');
-const pluginPackageScope = 'plugin/dsh-personal-dev-workflow/package.json';
 
 const failures = [];
 const checked = [];
@@ -253,38 +251,6 @@ function checkNoFlowCollections(skill, frontmatterText) {
   }
 }
 
-function listFiles(dir, base = dir) {
-  if (!existsSync(dir)) return [];
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listFiles(full, base));
-    else out.push(relative(base, full).replace(/\\/g, '/'));
-  }
-  return out;
-}
-
-function checkCopy(label, copyDir, skill) {
-  const canonicalDir = join(skillsDir, skill);
-  const scope = `${label}:${skill}`;
-  for (const rel of listFiles(canonicalDir)) {
-    const copyFile = join(copyDir, rel);
-    if (!existsSync(copyFile)) {
-      fail(scope, `copy is missing ${rel} (run scripts/sync-copies.mjs)`);
-      continue;
-    }
-    if (!readFileSync(join(canonicalDir, rel)).equals(readFileSync(copyFile))) {
-      fail(scope, `copy differs from canonical: ${rel} (run scripts/sync-copies.mjs)`);
-    }
-  }
-
-  for (const rel of listFiles(copyDir)) {
-    if (!existsSync(join(canonicalDir, rel))) {
-      fail(scope, `copy has an extra file: ${rel}`);
-    }
-  }
-}
-
 // --- A. canonical skills ---
 const rootVersion = readRootVersion();
 const sourceVersion = JSON.parse(readFileSync(rootPackageFile, 'utf8')).pdwSkillVersion;
@@ -340,43 +306,6 @@ if (rootVersion !== null) {
   }
 }
 
-// --- A3. version consistency (plugin package.json == root package.json) ---
-// The DSH bundle plugin carries its own manifest; without this check it could
-// keep advertising an old release number while every skill file is correct.
-const pluginVersion = readPackageVersion(
-  pluginPackageFile,
-  pluginPackageScope,
-  'plugin package.json',
-);
-if (rootVersion !== null && pluginVersion !== null && pluginVersion !== rootVersion) {
-  fail(
-    pluginPackageScope,
-    `"version" (${pluginVersion}) must equal the root package.json version (${rootVersion})`,
-  );
-}
-
-// --- B. packaged copies ---
-const copyTargets = [
-  {
-    label: 'plugin',
-    dir: join(repoRoot, 'plugin', 'dsh-personal-dev-workflow', 'skills'),
-    skills: ['personal-dev-workflow'],
-    nested: true,
-  },
-  { label: 'dist', dir: join(repoRoot, 'dist', 'skillhub-pkg'), skills: ['personal-dev-workflow'], nested: false },
-];
-
-for (const target of copyTargets) {
-  for (const skill of target.skills) {
-    const copyDir = target.nested ? join(target.dir, skill) : target.dir;
-    if (!existsSync(copyDir)) {
-      fail(`${target.label}:${skill}`, 'packaged copy directory is missing');
-      continue;
-    }
-    checkCopy(target.label, copyDir, skill);
-  }
-}
-
 // --- report ---
 for (const [skill, version] of skillVersions) {
   const matches = version === sourceVersion;
@@ -392,10 +321,8 @@ if (failures.length > 0) {
   console.error(`\n${failures.length} problem(s) across ${total} scope(s).`);
   process.exit(1);
 }
-console.log(`\nAll ${checked.length} canonical skill(s) and ${copyTargets.length} packaged copy set(s) valid.`);
+console.log(`\nAll ${checked.length} canonical skill(s) valid.`);
 if (rootVersion !== null) {
   console.log(`Source version: every canonical SKILL.md declares ${sourceVersion}, matching pdwSkillVersion.`);
-  if (pluginVersion !== null && pluginVersion === rootVersion) {
-    console.log(`Version consistency: ${pluginPackageScope} declares ${pluginVersion}, matching the root package.json.`);
-  }
+  console.log(`Distribution version: package.json declares ${rootVersion}.`);
 }
