@@ -4,9 +4,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findExecutable, invocation, parseResult, resultSchema, modelPromptContext } from './drivers.mjs';
+import { findExecutable, invocation, parseResult, resultSchema, modelPromptContext, validateProfile } from './drivers.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const version = '1.3.2-local';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -29,37 +30,66 @@ function managedRoot(project) {
   return { root, store };
 }
 
-function git(root, args) {
-  const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
-  return result.status === 0 ? result.stdout : null;
+function git(root, args, input) {
+  const result = spawnSync('git', ['-C', root, ...args], { input, encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+  return result.status === 0 || (args[0] === 'check-ignore' && result.status === 1) ? result.stdout : null;
 }
 
-export function snapshot(root) {
+function validateScope(scope) {
+  if (typeof scope !== 'string' || !scope || scope.includes('\\') || path.isAbsolute(scope) || path.win32.parse(scope).root
+    || scope.split('/').some(part => part === '..' || ignored.has(part))
+    || (scope !== '.' && scope.split('/').some(part => !part || part === '.'))) throw new Error(`Invalid scope (use a canonical relative path): ${scope}`);
+}
+
+export function snapshot(root, scopes = []) {
   const tracked = git(root, ['ls-files', '-c', '-o', '--exclude-standard', '-z']);
-  let files = [];
-  if (tracked !== null) files = [...new Set(tracked.split('\0').filter(Boolean))];
-  else {
-    function visit(relative = '') {
-      for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
-        if (ignored.has(entry.name)) continue;
-        const name = path.join(relative, entry.name);
-        if (entry.isDirectory()) visit(name); else files.push(name);
-      }
+  const files = new Set(tracked?.split('\0').filter(Boolean) ?? []);
+  const prefixes = [];
+  for (const scope of scopes) {
+    validateScope(scope);
+    let relative = '';
+    for (const part of scope.split('/').filter(part => part && part !== '.')) {
+      relative = relative ? `${relative}/${part}` : part;
+      prefixes.push(relative);
+      const file = path.join(root, relative);
+      let stat;
+      try { stat = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+      if (stat.isSymbolicLink()) throw new Error(`Scope traverses symbolic link: ${scope}`);
     }
-    visit();
   }
+  const ignoredPaths = tracked === null ? '' : git(root, ['check-ignore', '--no-index', '-z', '--stdin'], [root, ...prefixes].join('\0') + '\0');
+  if (ignoredPaths === null) throw new Error('Cannot determine Git ignore coverage; snapshot aborted');
+  const gitIgnored = new Set(ignoredPaths.split('\0').filter(Boolean));
+  const filesystem = tracked === null || files.size === 0 || gitIgnored.has(root) || scopes.includes('.');
+  function visit(relative = '') {
+    const file = path.join(root, relative);
+    if (!inside(root, file)) throw new Error(`Snapshot path escaped project: ${relative}`);
+    let stat;
+    try { stat = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') return; throw error; }
+    if (stat.isSymbolicLink() || stat.isFile()) { files.add(relative); return; }
+    if (!stat.isDirectory()) throw new Error(`Unsupported snapshot entry: ${relative}`);
+    for (const entry of fs.readdirSync(file, { withFileTypes: true })) {
+      if (!ignored.has(entry.name)) visit(path.join(relative, entry.name));
+    }
+  }
+  // ponytail: honor Git for ordinary files, but never let ignore rules blind an explicit task scope.
+  const scopeRoots = scopes.map(scope => prefixes.find(name => gitIgnored.has(name) && (scope === name || scope.startsWith(name + '/'))) ?? scope);
+  const forced = [...new Set(scopeRoots)].filter(name => !scopeRoots.some(parent => name !== parent && name.startsWith(parent + '/')));
+  if (filesystem) visit(); else for (const name of forced) visit(name);
   const contents = {};
-  for (let name of files.sort()) {
+  for (let name of [...files].sort()) {
     name = name.replaceAll('\\', '/');
     if (name.split('/').some(part => ignored.has(part))) continue;
     const file = path.resolve(root, name);
-    if (!inside(root, file) || !fs.existsSync(file)) continue;
-    const stat = fs.lstatSync(file);
+    if (!inside(root, file)) throw new Error(`Snapshot path escaped project: ${name}`);
+    let stat;
+    try { stat = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
     if (stat.isSymbolicLink()) contents[name] = `symlink:${fs.readlinkSync(file)}`;
     else if (stat.isFile()) contents[name] = hash(fs.readFileSync(file));
   }
   const head = git(root, ['rev-parse', 'HEAD'])?.trim() ?? null;
-  return { fingerprint: hash(JSON.stringify({ head, contents })), head, contents };
+  return { fingerprint: hash(JSON.stringify({ head, contents })), head, contents,
+    coverage: { source: filesystem ? 'filesystem' : 'git+scope', file_count: Object.keys(contents).length, forced_roots: forced, excluded_directories: [...ignored] } };
 }
 
 export function changed(before, after) {
@@ -70,9 +100,7 @@ export function changed(before, after) {
 function validateContract(task) {
   if (!task.goal?.trim() || !['audit', 'develop'].includes(task.mode)) throw new Error('Contract requires goal and mode: audit|develop');
   if (!Array.isArray(task.scope) || !task.scope.length) throw new Error('Contract requires nonempty scope');
-  for (const item of task.scope) {
-    if (typeof item !== 'string' || !item || item.includes('\\') || path.isAbsolute(item) || item.split('/').includes('..') || item.split('/').some(p => ['.git', '.pdw'].includes(p))) throw new Error(`Invalid scope: ${item}`);
-  }
+  for (const item of task.scope) validateScope(item);
   if (!Array.isArray(task.acceptance) || !task.acceptance.length || task.acceptance.some(a => !a.id || !a.description)) throw new Error('Contract requires acceptance [{id,description}]');
   if (new Set(task.acceptance.map(a => a.id)).size !== task.acceptance.length) throw new Error('Duplicate acceptance id');
   if (!Array.isArray(task.checks) || !task.checks.length) throw new Error('Contract requires at least one real check; do not invent a passing placeholder');
@@ -139,7 +167,7 @@ function createTask(root, from) {
   validateContract(task);
   const id = `${new Date().toISOString().slice(0, 19).replace(/\D/g, '')}-${crypto.randomBytes(3).toString('hex')}`;
   const files = taskFiles(root, id);
-  const baseline = snapshot(root);
+  const baseline = snapshot(root, task.scope);
   write(files.contract, task);
   write(path.join(files.dir, 'baseline.json'), baseline);
   write(files.state, { schema_version: 1, id, project: root, status: 'ready', phase: task.planner ? 'planner' : 'scan',
@@ -150,36 +178,42 @@ function createTask(root, from) {
   return { id, directory: files.dir, next: `plan ${id}` };
 }
 
-function writeHandoff(root, id) {
+function writeHandoff(root, id, observation) {
   const files = taskFiles(root, id), state = read(files.state), task = read(files.contract);
-  const current = snapshot(root), baseline = read(path.join(files.dir, 'baseline.json'));
+  if (!observation) {
+    try { observation = { current: snapshot(root, task.scope), error: null }; }
+    catch (error) { observation = { current: null, error: error.message }; }
+  }
+  const { current, error: snapshotError } = observation, baseline = read(path.join(files.dir, 'baseline.json'));
   const contractCurrent = hash(fs.readFileSync(files.contract)) === state.contract_hash;
-  const evidenceCurrent = current.fingerprint === state.artifact && contractCurrent;
+  const evidenceCurrent = Boolean(current && current.fingerprint === state.artifact && contractCurrent);
   const review = Object.entries(state.roles).filter(([name]) => name.startsWith('review-')).at(-1)?.[1];
   const data = {
     id, generated_at: stamp(), project: root, goal: task.goal, scope: task.scope, acceptance: task.acceptance,
     status: state.status, phase: state.phase, contract_current: contractCurrent, evidence_current: evidenceCurrent,
     accepted_current: state.status === 'accepted_local' && evidenceCurrent,
-    artifact: state.artifact, current_artifact: current.fingerprint, head: current.head,
-    changed_files: changed(baseline, current), calls_used: state.calls_used,
+    artifact: state.artifact, current_artifact: current?.fingerprint ?? null, head: current?.head ?? null,
+    snapshot_coverage: current?.coverage ?? { source: 'unavailable', file_count: null }, snapshot_error: snapshotError,
+    changes_known: Boolean(current), changed_files: current ? changed(baseline, current) : [], calls_used: state.calls_used,
     calls_remaining: Math.max(0, state.limits.max_cli_calls - state.calls_used),
     repairs_remaining: Math.max(0, state.limits.max_repairs - state.repairs_used),
     seconds_remaining: Math.max(0, Math.floor(state.limits.task_timeout_seconds - state.elapsed_ms / 1000)),
     active: state.active, failure: state.failure, cost: 'unknown',
     checks: state.checks.map(check => ({ id: check.id, exit_code: check.exit_code, reason: check.reason, stdout: check.stdout, stderr: check.stderr,
-      current: evidenceCurrent && check.artifact === current.fingerprint })),
+      current: evidenceCurrent && check.artifact === current?.fingerprint })),
     review: review ? { verdict: review.result.verdict, summary: review.result.summary, findings: review.result.findings,
-      current: evidenceCurrent && review.fingerprint === current.fingerprint, result_file: path.join(review.directory, 'result.json') } : null,
+      current: evidenceCurrent && review.fingerprint === current?.fingerprint, result_file: path.join(review.directory, 'result.json') } : null,
     role_results: Object.fromEntries(Object.entries(state.roles).map(([role, value]) => [role, path.join(value.directory, 'result.json')])),
     contract_file: files.contract, state_file: files.state, handoff_file: path.join(files.dir, 'HANDOFF.md'),
   };
-  data.next_action = !evidenceCurrent ? '源码或契约已变化：回查差异，不沿用旧验收或直接续跑，不通过新任务规避原限额。'
+  data.next_action = snapshotError ? `快照失败，覆盖未知：${snapshotError}；排查后再决定续跑，不能复用旧通过结论或重置预算。`
+    : !evidenceCurrent ? '源码或契约已变化：回查差异，不沿用旧验收或直接续跑，不通过新任务规避原限额。'
     : state.status === 'running' || state.active.length ? '先核对 status、运行锁与活动进程；不要启动第二个协调者。'
     : data.accepted_current ? '本地验收已通过；无需继续实施，提交或发布另行确认。'
     : state.status === 'ready' ? `核对 plan ${id} 后 run ${id}。`
     : `先排查失败与剩余额度；条件满足再 resume ${id}，不重新扫描已完成且仍有效的阶段。`;
   const checks = data.checks.map(c => `- ${c.id}: exit ${c.exit_code}；current=${c.current}；${c.stdout}`).join('\n');
-  write(data.handoff_file, `# ${id} 交接\n\n生成时间：${data.generated_at}。这是任务事实的派生视图；接手时运行 handoff ${id} 重新核对。\n\n目标：${data.goal}\n\n状态：${data.status}；阶段：${data.phase}；当前验收有效：${data.accepted_current}\n\n源码与契约证据仍有效：${data.evidence_current}；契约未漂移：${data.contract_current}\n\n下一步：${data.next_action}\n\n允许范围：${data.scope.join('、')}\n\n验收：\n${data.acceptance.map(a => `- ${a.id}: ${a.description}`).join('\n')}\n\n已变化文件：${data.changed_files.slice(0, 40).join('、') || '无'}${data.changed_files.length > 40 ? '（完整列表见下方结构化快照）' : ''}\n\n检查：\n${checks || '- 尚未运行'}\n\n独立复核：${data.review ? `${data.review.verdict}；current=${data.review.current}；${data.review.result_file}` : '尚未完成'}\n\n问题：${data.failure ?? '无已记录阻断；未完成的阶段不算通过'}\n\n预算：已用 ${data.calls_used} 次 CLI；剩余 ${data.calls_remaining} 次、${data.repairs_remaining} 次修复、${data.seconds_remaining} 秒；费用 unknown。换对话不重置。\n\n活动进程：${data.active.length}（以最新 state/运行锁为准）。角色决策与原始证据从以下路径回查，不依赖聊天摘要。\n\n## 结构化快照\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\`\n`);
+  write(data.handoff_file, `# ${id} 交接\n\n生成时间：${data.generated_at}。这是任务事实的派生视图；接手时运行 handoff ${id} 重新核对。\n\n目标：${data.goal}\n\n状态：${data.status}；阶段：${data.phase}；当前验收有效：${data.accepted_current}\n\n源码与契约证据仍有效：${data.evidence_current}；契约未漂移：${data.contract_current}\n\n下一步：${data.next_action}\n\n允许范围：${data.scope.join('、')}\n\n验收：\n${data.acceptance.map(a => `- ${a.id}: ${a.description}`).join('\n')}\n\n已变化文件：${data.changes_known ? data.changed_files.slice(0, 40).join('、') || '无' : '无法确定（快照失败）'}${data.changed_files.length > 40 ? '（完整列表见下方结构化快照）' : ''}\n\n检查：\n${checks || '- 尚未运行'}\n\n独立复核：${data.review ? `${data.review.verdict}；current=${data.review.current}；${data.review.result_file}` : '尚未完成'}\n\n问题：${data.failure ?? snapshotError ?? '无已记录阻断；未完成的阶段不算通过'}\n\n预算：已用 ${data.calls_used} 次 CLI；剩余 ${data.calls_remaining} 次、${data.repairs_remaining} 次修复、${data.seconds_remaining} 秒；费用 unknown。换对话不重置。\n\n活动进程：${data.active.length}（以最新 state/运行锁为准）。角色决策与原始证据从以下路径回查，不依赖聊天摘要。\n\n## 结构化快照\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\`\n`);
   return data;
 }
 
@@ -305,7 +339,7 @@ export async function runTask(root, id, resume = false) {
     if (hash(fs.readFileSync(files.contract)) !== state.contract_hash || hash(fs.readFileSync(path.join(store, 'config.json'))) !== configHash) throw new Error('Contract/config changed; do not reuse this run to bypass limits');
     if (fs.existsSync(files.cancel)) throw new Error('Task cancelled');
     if (state.elapsed_ms >= config.limits.task_timeout_seconds * 1000) throw new Error('Task time budget exhausted');
-    const current = snapshot(root);
+    const current = snapshot(root, task.scope);
     if (current.fingerprint !== state.artifact) throw new Error('Source drift detected; old evidence cannot approve the changed artifact');
     return current;
   }
@@ -326,7 +360,7 @@ export async function runTask(root, id, resume = false) {
     const remaining = Math.max(1, Math.floor(config.limits.task_timeout_seconds - state.elapsed_ms / 1000));
     const result = await execute(native.executable, native.args, root, path.join(directory, 'process'), Math.min(config.limits.call_timeout_seconds, remaining), context, native.stdin);
     attempt.process = result; attempt.finished_at = stamp(); attempt.status = 'failed'; context.save();
-    const after = snapshot(root);
+    const after = snapshot(root, task.scope);
     if (!['implement', 'repair'].includes(role) && after.fingerprint !== before.fingerprint) throw new Error(`${role} changed source despite its read-only assignment`);
     scopeCheck(task, baseline, after);
     if (hash(fs.readFileSync(files.contract)) !== state.contract_hash || hash(fs.readFileSync(path.join(store, 'config.json'))) !== configHash) throw new Error('Agent modified contract/config');
@@ -390,14 +424,22 @@ export async function runTask(root, id, resume = false) {
     state.status = fs.existsSync(files.cancel) ? 'cancelled' : 'blocked'; state.failure = error.message;
   } finally {
     if (heartbeat) clearInterval(heartbeat);
-    tick(); state.updated_at = stamp(); context.save();
-    const actualChanges = changed(baseline, snapshot(root));
-    const review = Object.entries(state.roles).filter(([name]) => name.startsWith('review-')).at(-1)?.[1];
-    const checksText = state.checks.map(check => `- ${check.id}: exit ${check.exit_code}${check.reason ? ` (${check.reason})` : ''}；${check.stdout}`).join('\n');
-    write(path.join(files.dir, 'REPORT.md'), `# ${id}\n\n状态：${state.status}\n\n目标：${task.goal}\n\n改动：${actualChanges.slice(0, 20).join('、') || '无源码修改'}${actualChanges.length > 20 ? '（其余见差异清单）' : ''}\n\n检查：\n${checksText || '- 尚未运行'}\n\n独立复核：${review?.result.summary.slice(0, 600) ?? '尚未完成'}\n\nCLI 调用：${state.calls_used}/${config.limits.max_cli_calls}；修复：${state.repairs_used}/${config.limits.max_repairs}；活动进程：${state.active.length}\n\n费用：unknown（未声称金额硬限制）\n\n产物：${state.artifact}\n\n问题：${state.failure ?? '无阻断问题；本地验收通过不等于提交或发布'}\n\n下一步：${state.status === 'accepted_local' ? '用户验收；提交/发布另行确认' : `排查上述问题后 resume ${id}；源码变化则另建任务`}\n\n原始证据：attempts/、checks-*、state.json。\n`);
-    write(path.join(files.dir, 'changed-files.json'), actualChanges);
-    writeHandoff(root, id);
-    if (state.active.length === 0) release();
+    try {
+      tick(); state.updated_at = stamp(); context.save();
+      let observation;
+      try { observation = { current: snapshot(root, task.scope), error: null }; }
+      catch (error) { observation = { current: null, error: error.message }; }
+      if (observation.error) {
+        if (state.status !== 'cancelled') state.status = 'blocked';
+        state.failure ??= observation.error; context.save();
+      }
+      const actualChanges = observation.current ? changed(baseline, observation.current) : null;
+      const review = Object.entries(state.roles).filter(([name]) => name.startsWith('review-')).at(-1)?.[1];
+      const checksText = state.checks.map(check => `- ${check.id}: exit ${check.exit_code}${check.reason ? ` (${check.reason})` : ''}；${check.stdout}`).join('\n');
+      write(path.join(files.dir, 'REPORT.md'), `# ${id}\n\n状态：${state.status}\n\n目标：${task.goal}\n\n改动：${actualChanges ? actualChanges.slice(0, 20).join('、') || '无源码修改' : '无法确定（快照失败）'}${actualChanges?.length > 20 ? '（其余见差异清单）' : ''}\n\n检查：\n${checksText || '- 尚未运行'}\n\n独立复核：${review?.result.summary.slice(0, 600) ?? '尚未完成'}\n\nCLI 调用：${state.calls_used}/${config.limits.max_cli_calls}；修复：${state.repairs_used}/${config.limits.max_repairs}；活动进程：${state.active.length}\n\n费用：unknown（未声称金额硬限制）\n\n产物：${state.artifact}\n\n问题：${state.failure ?? '无阻断问题；本地验收通过不等于提交或发布'}\n\n下一步：${state.status === 'accepted_local' ? '用户验收；提交/发布另行确认' : `排查上述问题后 resume ${id}；源码变化则另建任务`}\n\n原始证据：attempts/、checks-*、state.json。\n`);
+      write(path.join(files.dir, 'changed-files.json'), actualChanges);
+      writeHandoff(root, id, observation);
+    } finally { if (state.active.length === 0) release(); }
   }
   return state;
 }
@@ -405,13 +447,18 @@ export async function runTask(root, id, resume = false) {
 function doctor(root) {
   const config = configFor(root);
   const roles = Object.entries(config.roles).map(([role, profile]) => {
-    const binary = profile.executable && fs.existsSync(profile.executable);
+    let configurationError = null;
+    try { validateProfile(profile); } catch (error) { configurationError = error.message; }
+    const modelExplicit = typeof profile.model === 'string' && Boolean(profile.model.trim());
+    const modelReady = modelExplicit || ['codex', 'agy'].includes(profile.backend);
+    const binary = profile.executable && fs.existsSync(profile.executable) && (process.platform !== 'win32' || /\.exe$/i.test(profile.executable));
     const result = binary ? spawnSync(profile.executable, ['--version'], { encoding: 'utf8', timeout: 15000, windowsHide: true }) : null;
-    return { role, backend: profile.backend, executable: profile.executable, model: profile.model ?? 'host-default',
+    return { role, backend: profile.backend, executable: profile.executable, model: modelExplicit ? profile.model : 'host-default',
       available: Boolean(binary && result.status === 0), version: result?.stdout?.trim() ?? null,
-      model_explicit: profile.backend !== 'opencode' || Boolean(profile.model) };
+      model_explicit: modelExplicit, model_source: modelExplicit ? 'explicit' : 'host-default',
+      ready: Boolean(binary && result.status === 0 && modelReady && !configurationError), configuration_error: configurationError };
   });
-  return { roles, money_limit: 'not enforced', permissions: 'host policy; no bypass flags',
+  return { version, roles, authentication: 'not_checked', provider_routing: 'not_checked', money_limit: 'not enforced', permissions: 'host policy; no bypass flags',
     note: 'Binary/version discovery only. Authentication, model routing and output protocol require a real task.' };
 }
 
@@ -444,7 +491,7 @@ async function main(argv) {
     console.log(JSON.stringify({ installed: target, launcher, initialized: true, next: 'Ask your coding agent: use PDW to complete <goal>. Or run ./pdw.ps1 doctor' }, null, 2)); return;
   }
   if (command === 'help' || !command) {
-    console.log('PDW 1.3 local: init | doctor | demo | new --from <contract.json> | plan <id> | run <id> | resume <id> | status [id] | handoff <id> | cancel <id> | install --project <existing-dir>\nAll commands accept --project <dir>. demo invokes configured models for a read-only audit. No dependency installation, commit, publish or destructive cleanup.'); return;
+    console.log(`PDW ${version}: init | doctor | demo | new --from <contract.json> | plan <id> | run <id> | resume <id> | status [id] | handoff <id> | cancel <id> | install --project <existing-dir>\nAll commands accept --project <dir>. demo invokes configured models for a read-only audit. No dependency installation, commit, publish or destructive cleanup.`); return;
   }
   const { root, store } = managedRoot(project);
   if (command === 'demo') {
@@ -455,7 +502,7 @@ async function main(argv) {
     console.log(JSON.stringify({ id: created.id, status: state.status, failure: state.failure, report: path.join(created.directory, 'REPORT.md') }, null, 2));
     process.exitCode = state.status === 'accepted_local' ? 0 : 1; return;
   }
-  if (command === 'doctor') { const report = doctor(root); console.log(JSON.stringify(report, null, 2)); process.exitCode = report.roles.filter(r => r.role !== 'planner').every(r => r.available && r.model_explicit) ? 0 : 1; return; }
+  if (command === 'doctor') { const report = doctor(root); console.log(JSON.stringify(report, null, 2)); process.exitCode = report.roles.filter(r => r.role !== 'planner').every(r => r.ready) ? 0 : 1; return; }
   if (command === 'new') { const from = flag('--from'); if (!from) throw new Error('new requires --from <contract.json>; the Skill prepares this contract for the user'); console.log(JSON.stringify(createTask(root, from), null, 2)); return; }
   const id = args.shift();
   if (command === 'status' && !id) {
@@ -464,7 +511,7 @@ async function main(argv) {
   }
   const files = taskFiles(root, id);
   if (command === 'handoff') { console.log(JSON.stringify(writeHandoff(root, id), null, 2)); return; }
-  if (command === 'status') { const state = read(files.state); console.log(JSON.stringify({ ...state, evidence_current: snapshot(root).fingerprint === state.artifact }, null, 2)); return; }
+  if (command === 'status') { const state = read(files.state), current = snapshot(root, read(files.contract).scope); console.log(JSON.stringify({ ...state, evidence_current: current.fingerprint === state.artifact, snapshot_coverage: current.coverage }, null, 2)); return; }
   if (command === 'plan') {
     const task = read(files.contract), config = configFor(root); validateContract(task);
     const roles = [...(task.planner ? ['planner'] : []), 'scan', 'test-plan', ...(task.mode === 'develop' ? ['implement'] : []), 'review'];

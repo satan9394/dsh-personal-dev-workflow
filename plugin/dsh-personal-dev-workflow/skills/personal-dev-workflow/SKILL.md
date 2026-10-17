@@ -1,17 +1,11 @@
 ---
 name: personal-dev-workflow
 description: "Run cost-aware multi-agent project work with OpenCode/DeepSeek, Codex, and optional AGY: create an executable task contract, dispatch isolated role sessions, run checks, review independently, and resume from recorded evidence. Use for substantial implementation, investigation, or explicit PDW workflow requests."
-license: MIT
-compatibility: Portable Agent Skills format; the workflow itself is tool-agnostic. The optional executable relay (scripts/pdw.mjs) requires Node.js 18+ and CLI agents (OpenCode / Codex / AGY). Host-level hard enforcement is not provided by this skill.
-metadata:
-  version: "2.0.0"
-  language: "zh-CN"
-  architecture: "executable-relay"
 ---
 
 # Personal Dev Workflow — 可执行的项目协作
 
-版本：2.0.0；说明语言：zh-CN。
+版本：1.3.2-local；说明语言：zh-CN。
 
 这是既有 PDW 的项目级升级版：保留契约、验证、交接、有限修复；增加真实 CLI 接力。程序为本 Skill 的 `scripts/pdw.mjs`，以 Skill 的绝对位置调用，不假定当前目录含 scripts。
 
@@ -28,7 +22,7 @@ metadata:
 3. `new --from <契约> --project <项目>` 创建任务；先 `plan <id>` 检查角色、模型、检查项、调用上限。用户已要求完成任务时，在其授权范围内直接 `run <id>`，不另问是否允许普通本地实施。
 4. 默认 OC + DeepSeek 扫描与验收准备，Codex 实现，独立 OC + DeepSeek 复核。常规实现可在项目配置把 implement 路由到 OC。需要架构规划时在契约中启用 planner，使用 AGY。不同角色是新会话，不共享长聊天。
 5. 程序实际执行验收命令；失败最多定向修复一次，再失败即停止。遇到范围变化、环境阻塞或不支持的输出协议，保留原始结果并交接，不能凭文字宣布通过。
-6. 查看 `status <id>` 和任务目录的 REPORT.md。每个阶段程序自动生成 HANDOFF.md，命令与换对话流程见 [上下文接续](references/runtime.md)。中断后用 `resume <id>`；停止用 `cancel <id>`。切会话不重置额度，不通过另建任务规避原任务限额。
+6. 查看 `status <id>` 和任务目录的 REPORT.md。每个阶段程序自动生成 HANDOFF.md，命令与换对话流程见 [上下文接续](references/runtime.md#上下文接续与文档维护)。中断后用 `resume <id>`；停止用 `cancel <id>`。切会话不重置额度，不通过另建任务规避原任务限额。
 
 ## 按目标模型交接
 
@@ -36,7 +30,7 @@ metadata:
 
 确认执行角色的实际模型标识、宿主支持与思考等级，保留用户指定模型。首次使用或切换模型时查其官方选择/提示指导及宿主接口；记录来源与核对日期到任务准备材料。有效且仍适用的记录可复用，不每次重复联网。无法识别宿主默认模型时不猜测其特性。
 
-协调者将简短、适用于该模型和当前任务的提示指导写入角色配置 `prompt_guidance`；Codex 可另设 `reasoning_effort`。用法与限制见 [模型交接配置](references/runtime.md)。强模型以目标、约束、证据和自主空间为主；清晰小任务缩小交接范围。不要机械增加提示长度、角色数或最高思考等级，不要求公开内部思维链。
+协调者将简短、适用于该模型和当前任务的提示指导写入角色配置 `prompt_guidance`；Codex 可另设 `reasoning_effort`。用法与限制见 [模型交接配置](references/runtime.md#模型交接配置)。强模型以目标、约束、证据和自主空间为主；清晰小任务缩小交接范围。不要机械增加提示长度、角色数或最高思考等级，不要求公开内部思维链。
 
 运行器只传递已配置的模型指导和参数，不自动联网选模型，也不证明提供方最终采用了请求设置。模型改变后重新核对指导与参数；未知模型沿用通用契约，不套用其他模型结论。独立复核按原始需求与验收检验结果，不能只确认是否遵循计划。
 
@@ -46,6 +40,7 @@ metadata:
 - UI 任务的契约必须包含真实浏览器操作证据；build/curl 不替代业务验收。运行工具不能凭空提供浏览器能力。
 - 不自行 commit/push/merge/send/deploy/publish/delete；用户确认点保留。已有授权按其实际范围执行。
 - CLI 权限继续由宿主控制，程序不传跳过权限参数。源码范围检查是执行后检测，不是文件系统沙箱。
+- 核对 status/handoff 的 snapshot_coverage；项目根被 Git 忽略或 Git 列表为空时使用文件系统快照，显式任务 scope 不受 Git ignore 隐藏。不能观察的保留目录和链接路径须先调整范围，不能把空覆盖当成通过。
 - 时间与 CLI 启动次数有程序上限；金额/Token 总上限没有提供方证据时标 unknown，不能宣称硬限制。
 - 不启动嵌套 Agent、不自动接 backlog、不升级全局工具、不永久清理任务记录。
 
@@ -72,7 +67,7 @@ metadata:
 
 ## 新 Agent 与宿主子 Agent
 
-角色是职责，CLI 是执行工具，模型是能力与成本选择；三者不绑定。当前程序仅适配 OC、Codex、AGY；DSH、CC 等接入条件见 [运行说明的扩展边界](references/runtime.md)。不把读取 Skill、支持子 Agent 或修改 backend 名称汇报成自动接力已兼容。
+角色是职责，CLI 是执行工具，模型是能力与成本选择；三者不绑定。当前程序仅适配 OC、Codex、AGY；DSH、CC 等接入条件见 [运行说明的扩展边界](references/runtime.md#第三方-agent-与宿主子-agent)。不把读取 Skill、支持子 Agent 或修改 backend 名称汇报成自动接力已兼容。
 
 宿主子 Agent 可以承接独立职责，但必须由唯一协调者管理范围、证据与预算。当前 CLI 运行器仍禁止角色自行嵌套调度；需要宿主原生团队时以辅助模式另行执行同一契约，不与 CLI 运行器争抢任务或伪造其验收状态。
 

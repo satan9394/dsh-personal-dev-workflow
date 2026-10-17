@@ -4,14 +4,16 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseResult, invocation, modelPromptContext } from './drivers.mjs';
+import { snapshot } from './pdw.mjs';
 
 const runtime = fileURLToPath(new URL('./pdw.mjs', import.meta.url));
-const project = path.resolve(path.dirname(runtime), '../../../..');
+const project = path.resolve(path.dirname(runtime), fs.existsSync(new URL('../../../package.json', import.meta.url)) ? '../../..' : '../../../..');
 const evidence = path.join(project, '.pdw', 'test-runs', `${Date.now()}`);
 fs.mkdirSync(evidence, { recursive: true });
 const mock = path.join(evidence, 'fake-cli.mjs');
 fs.writeFileSync(mock, `
 import fs from 'node:fs';
+import path from 'node:path';
 import {spawn} from 'node:child_process';
 const args=process.argv.slice(2), mode=args.shift();
 if(args.includes('--version')){console.log('fixture');process.exit(0)}
@@ -27,8 +29,11 @@ if(mode==='hang'){
  if(role==='implement'||role==='repair'){
   fs.writeFileSync('result.txt',mode==='repair'&&role==='implement'?'wrong':'correct');
   if(mode==='scope')fs.writeFileSync('outside.txt','unexpected');
+  if(mode==='ignored-scope')fs.writeFileSync('.agents/outside.txt','unexpected');
+  if(mode==='linked-scope')fs.symlinkSync(path.resolve('target-dir'),'source-dir',process.platform==='win32'?'junction':'dir');
  }
  if(mode==='mutating-review'&&role==='review')fs.writeFileSync('result.txt','mutated');
+ if(mode==='mutating-ignored-review'&&role==='review')fs.writeFileSync('.agents/inside.txt','mutated');
  const value={verdict:'pass',summary:'Fixture role finished',findings:[],acceptance:role==='review'?[{id:'AC1',status:'pass',evidence:'Actual result.txt and check log'}]:[]};
  const emit=()=>console.log(JSON.stringify({type:'text',part:{text:mode==='malformed'?'not structured':JSON.stringify(value)}}));
  if(mode==='slow')setTimeout(emit,1200);else emit();
@@ -40,14 +45,21 @@ function command(root, args, expected = 0) {
   assert.equal(result.status, expected, `${args.join(' ')}\n${result.stdout}\n${result.stderr}`);
   return result;
 }
-function setup(name, mode = 'success', limits = {}, audit = false) {
+function setup(name, mode = 'success', limits = {}, audit = false, options = {}) {
   const root = path.join(evidence, name); fs.mkdirSync(root);
+  if (options.git) {
+    const result = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  for (const [name, value] of Object.entries(options.files ?? {})) {
+    const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value);
+  }
   command(root, ['init']);
   const profile = { backend: 'opencode', executable: process.execPath, args: [mock, mode], model: 'fixture/deepseek' };
   const config = { roles: { scan: profile, 'test-plan': profile, implement: profile, review: profile }, limits: {
     max_cli_calls: 8, max_repairs: 1, call_timeout_seconds: 10, task_timeout_seconds: 60, ...limits }, cost: { status: 'unknown' } };
   fs.writeFileSync(path.join(root, '.pdw', 'config.json'), JSON.stringify(config));
-  const contract = { goal: 'Create result.txt containing correct, verified by a real subprocess', mode: audit ? 'audit' : 'develop', scope: ['result.txt'],
+  const contract = { goal: 'Create result.txt containing correct, verified by a real subprocess', mode: audit ? 'audit' : 'develop', scope: options.scope ?? ['result.txt'],
     acceptance: [{ id: 'AC1', description: 'result.txt contains correct' }],
     checks: [{ id: 'contents', command: process.execPath, args: ['-e', "const fs=require('node:fs');if(fs.readFileSync('result.txt','utf8')!=='correct')process.exit(3)"] }] };
   const contractFile = path.join(root, '.pdw', 'input.json'); fs.writeFileSync(contractFile, JSON.stringify(contract));
@@ -205,6 +217,112 @@ await test('automatic blocked handoff includes the failed check without inventin
   const h = JSON.parse(command(t.root, ['handoff', t.id]).stdout);
   assert.equal(h.accepted_current, false); assert.equal(h.review, null); assert.equal(h.repairs_remaining, 0);
   assert.ok(h.failure); assert.equal(h.calls_used, t.state().calls_used);
+});
+
+await test('installed-layout fixtures inside an ignored ancestor retain source coverage', () => {
+  const t = setup('ignored-ancestor');
+  const baseline = JSON.parse(fs.readFileSync(path.join(path.dirname(t.stateFile), 'baseline.json'), 'utf8'));
+  assert.ok(baseline.contents['.gitignore']);
+  assert.ok(baseline.coverage.file_count > 0);
+  const h = JSON.parse(command(t.root, ['handoff', t.id]).stdout);
+  assert.ok(h.snapshot_coverage.file_count > 0);
+});
+await test('empty Git listing falls back to filesystem instead of an empty guard', () => {
+  const t = setup('empty-git-list', 'success', {}, false, { git: true, files: { '.gitignore': '*\n', 'source.txt': 'keep' } });
+  const s = snapshot(t.root);
+  assert.equal(s.coverage.source, 'filesystem'); assert.ok(s.contents['source.txt']);
+  assert.ok(!Object.keys(s.contents).some(name => name.startsWith('.pdw/')));
+});
+await test('Git ignore rules do not hide scoped source from drift or handoff', () => {
+  const t = setup('ignored-git-scope', 'success', {}, false, { git: true, files: { '.gitignore': '.agents/\n', '.agents/inside.txt': 'keep' }, scope: ['result.txt', '.agents/inside.txt'] });
+  const baseline = JSON.parse(fs.readFileSync(path.join(path.dirname(t.stateFile), 'baseline.json'), 'utf8'));
+  assert.ok(baseline.contents['.agents/inside.txt']);
+  assert.ok(baseline.coverage.forced_roots.includes('.agents'));
+  fs.writeFileSync(path.join(t.root, '.agents/inside.txt'), 'drift');
+  command(t.root, ['run', t.id], 1); assert.equal(t.state().calls_used, 0); assert.match(t.state().failure, /Source drift/);
+  assert.equal(JSON.parse(command(t.root, ['handoff', t.id]).stdout).evidence_current, false);
+});
+await test('ignored scope siblings still trigger out-of-scope enforcement', () => {
+  const t = setup('ignored-git-sibling', 'ignored-scope', {}, false, { git: true, files: { '.gitignore': '.agents/\n', '.agents/inside.txt': 'keep' }, scope: ['result.txt', '.agents/inside.txt'] });
+  command(t.root, ['run', t.id], 1); assert.match(t.state().failure, /Out-of-scope.*\.agents\/outside\.txt/);
+});
+await test('git info exclude cannot hide a read-only mutation of scoped source', () => {
+  const t = setup('info-exclude-readonly', 'mutating-ignored-review', {}, false, { git: true, files: { '.git/info/exclude': '.agents/\n', '.agents/inside.txt': 'keep' }, scope: ['result.txt', '.agents/inside.txt'] });
+  command(t.root, ['run', t.id], 1); assert.match(t.state().failure, /read-only/);
+});
+await test('accepted status detects later changes in a Gitignored task scope', () => {
+  const t = setup('ignored-scope-status', 'success', {}, false, { git: true, files: { '.gitignore': '.agents/\n', '.agents/inside.txt': 'keep' }, scope: ['result.txt', '.agents/inside.txt'] });
+  command(t.root, ['run', t.id]);
+  fs.writeFileSync(path.join(t.root, '.agents/inside.txt'), 'changed');
+  const status = JSON.parse(command(t.root, ['status', t.id]).stdout);
+  assert.equal(status.evidence_current, false); assert.ok(status.snapshot_coverage.forced_roots.includes('.agents'));
+});
+await test('permanently excluded directories are rejected as task scope before model use', () => {
+  const t = setup('unobservable-scope');
+  const from = path.join(t.root, '.pdw/input.json');
+  const task = JSON.parse(fs.readFileSync(from, 'utf8')); task.scope = ['node_modules/package']; fs.writeFileSync(from, JSON.stringify(task));
+  assert.match(command(t.root, ['new', '--from', from], 1).stderr, /Invalid scope/);
+});
+await test('noncanonical scope aliases cannot hide ignored ancestors or mismatch scope checks', () => {
+  const t = setup('scope-aliases');
+  const from = path.join(t.root, '.pdw/input.json'), task = JSON.parse(fs.readFileSync(from, 'utf8'));
+  for (const scope of ['./.agents/inside.txt', '.agents//inside.txt', '.agents/./inside.txt', 'result.txt/', 'C:relative.txt']) {
+    task.scope = [scope]; fs.writeFileSync(from, JSON.stringify(task));
+    assert.match(command(t.root, ['new', '--from', from], 1).stderr, /canonical relative path/);
+    assert.throws(() => snapshot(t.root, [scope]), /canonical relative path/);
+  }
+  assert.equal(t.state().calls_used, 0);
+});
+await test('scope traversal through a directory link fails before model use', () => {
+  const t = setup('symlink-scope');
+  const destination = path.join(evidence, 'outside-link-target'); fs.mkdirSync(destination);
+  fs.writeFileSync(path.join(destination, 'file.txt'), 'keep');
+  fs.symlinkSync(destination, path.join(t.root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+  const from = path.join(t.root, '.pdw/input.json');
+  const task = JSON.parse(fs.readFileSync(from, 'utf8')); task.scope = ['linked/file.txt']; fs.writeFileSync(from, JSON.stringify(task));
+  assert.match(command(t.root, ['new', '--from', from], 1).stderr, /symbolic link/);
+  assert.equal(fs.readFileSync(path.join(destination, 'file.txt'), 'utf8'), 'keep');
+  fs.symlinkSync(path.join(evidence, 'missing-link-target'), path.join(t.root, 'dangling'), process.platform === 'win32' ? 'junction' : 'dir');
+  task.scope = ['dangling/file.txt']; fs.writeFileSync(from, JSON.stringify(task));
+  assert.match(command(t.root, ['new', '--from', from], 1).stderr, /symbolic link/);
+});
+await test('snapshot failure after implementation records unknown coverage and releases the lock', () => {
+  const t = setup('snapshot-failure-finalization', 'linked-scope', {}, false, { files: { 'target-dir/keep.txt': 'keep' }, scope: ['result.txt', 'source-dir'] });
+  command(t.root, ['run', t.id], 1);
+  assert.equal(t.state().status, 'blocked'); assert.equal(t.state().active.length, 0);
+  assert.match(t.state().failure, /symbolic link/); assert.ok(!fs.existsSync(path.join(t.root, '.pdw/run.lock')));
+  assert.match(fs.readFileSync(path.join(path.dirname(t.stateFile), 'REPORT.md'), 'utf8'), /无法确定/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(path.dirname(t.stateFile), 'changed-files.json'), 'utf8')), null);
+  const h = JSON.parse(command(t.root, ['handoff', t.id]).stdout);
+  assert.equal(h.accepted_current, false); assert.equal(h.changes_known, false);
+  assert.equal(h.snapshot_coverage.source, 'unavailable'); assert.equal(h.snapshot_coverage.file_count, null);
+  assert.match(h.snapshot_error, /symbolic link/);
+});
+await test('doctor reports host defaults honestly without mislabelling them explicit', () => {
+  const t = setup('doctor-host-default');
+  t.config.roles.implement = { backend: 'codex', executable: process.execPath, model: null };
+  t.config.roles.planner = { backend: 'agy', executable: process.execPath, model: null };
+  fs.writeFileSync(path.join(t.root, '.pdw/config.json'), JSON.stringify(t.config));
+  const report = JSON.parse(command(t.root, ['doctor']).stdout);
+  for (const name of ['implement', 'planner']) {
+    assert.equal(report.roles.find(r => r.role === name).model_explicit, false);
+    assert.equal(report.roles.find(r => r.role === name).model_source, 'host-default');
+    assert.equal(report.roles.find(r => r.role === name).ready, true);
+  }
+  assert.equal(report.authentication, 'not_checked'); assert.equal(report.provider_routing, 'not_checked');
+});
+await test('doctor rejects missing OC models and policy-changing profile prefixes', () => {
+  const t = setup('doctor-invalid-profile');
+  t.config.roles.scan.model = null;
+  fs.writeFileSync(path.join(t.root, '.pdw/config.json'), JSON.stringify(t.config));
+  let report = JSON.parse(command(t.root, ['doctor'], 1).stdout);
+  assert.equal(report.roles.find(r => r.role === 'scan').model_explicit, false);
+  assert.equal(report.roles.find(r => r.role === 'scan').ready, false);
+  t.config.roles.scan.model = 'fixture/deepseek'; t.config.roles.implement.args = ['--add-dir', '../outside'];
+  fs.writeFileSync(path.join(t.root, '.pdw/config.json'), JSON.stringify(t.config));
+  report = JSON.parse(command(t.root, ['doctor'], 1).stdout);
+  assert.equal(report.roles.find(r => r.role === 'implement').ready, false);
+  assert.ok(report.roles.find(r => r.role === 'implement').configuration_error);
 });
 
 fs.writeFileSync(path.join(evidence, 'results.json'), JSON.stringify({ scope: 'Fixture CLI orchestration, not live provider integration', outcomes }, null, 2));

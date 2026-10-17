@@ -1,4 +1,4 @@
-# PDW 2.0.0 运行工具
+# PDW 1.3.2 本地运行工具
 
 仅依赖 Node.js 18+ 与已经安装、登录的 CLI；代码使用 Node 标准库，沿用 PDW 的 JavaScript 脚本形式，不安装 TypeScript/Next.js 或新依赖。
 
@@ -9,7 +9,7 @@
 在项目根目录用 `node <本Skill绝对路径>/scripts/pdw.mjs <命令>`；当前研究项目还提供 `pdw.ps1` 包装。
 
 - `init`：创建 `.pdw/config.json`、任务目录，并给项目 `.gitignore` 追加 `.pdw/`；已有配置保持原样。
-- `doctor`：核对可执行文件、版本和显式低成本模型；**不等于登录、调用或输出协议已通过**。
+- `doctor`：核对原生可执行文件、版本与角色配置。model_explicit 只表示显式填写模型；Codex/AGY 的 host-default 不再被标成 explicit。ready 可接受这两个后端的宿主默认，OC 则必须显式指定模型；退出码 0 仅表示非 planner 角色 ready，**不等于登录、模型路由、调用或输出协议已通过**。
 - `new --from <JSON文件>`：冻结一张任务卡、基线和任务限额，返回任务 ID。
 - `plan <id>`：列出会用的角色、模型、检查与预算；不调用模型。
 - `run <id>`：启动任务。默认两个独立的只读扫描/验收准备会话并行；实现、机器检查、独立复核串行。
@@ -21,6 +21,10 @@
 - `install --project <已存在目录>`：将本 Skill 完整复制为该项目 `.agents/skills/personal-dev-workflow`。目标已有同名 Skill 时拒绝覆盖，先比较迁移。
 
 所有命令支持 `--project <项目绝对路径>`。运行失败保留 REPORT.md、状态、完整 stdout/stderr 与验收命令输出，不删除证据。
+
+Windows 的 init 按 PATH 查找原生 exe；Codex 的 npm 壳会解析到官方可选平台包或旧 vendor 布局中的 codex.exe，不执行 .cmd/.ps1 壳。原生 exe 优先，支持中文路径；找不到就由 doctor 明确报不可用。init 不覆盖已有配置，因此宿主升级后旧 hash 路径失效时，仍需重新核对并显式更新该项目 executable；不要复制其他机器路径。
+
+已有同名 Skill 的升级仍需先比较与可回滚备份，再迁移完整目录、入口及必要的 Hook 引用；没有自动 upgrade 命令或旧 runstate 状态转换。保留进行中的 Mission、原始证据与已用预算，到安全边界切换，不能用重装重置额度。新配置初始化成功后先 doctor，再做隔离小任务确认实际登录/输出协议；不要仅凭 doctor 放行真实业务任务。
 
 ## 上下文接续与文档维护
 
@@ -51,13 +55,13 @@ ponytail: 程序不读取上下文百分比、不自动创建或归档宿主对�
 }
 ```
 
-路径相对项目根目录，scope 不接受 `..`、绝对路径或 `.git/.pdw`。检查必须是项目确实存在、有意义的命令；不能为了创建成功编造一个永远返回 0 的检查。Windows 的 cmd/bat/ps1 不是可直接 spawn 的原生程序：用 `powershell.exe -NoProfile -File ...` 等显式 executable/args 形式。项目用 pnpm 时，也须找到其原生入口或通过显式 PowerShell `-File` 调用，不拼接不受信文本。
+路径相对项目根目录，scope 使用 `.` 或规范的正斜杠相对路径；拒绝 `./`、内部 `.`、重复/末尾斜杠、`..`、盘符相对路径、绝对路径及保留排除目录，避免快照与范围检查使用不同的路径名称。检查必须是项目确实存在、有意义的命令；不能为了创建成功编造一个永远返回 0 的检查。Windows 的 cmd/bat/ps1 不是可直接 spawn 的原生程序：用 `powershell.exe -NoProfile -File ...` 等显式 executable/args 形式。项目用 pnpm 时，也须找到其原生入口或通过显式 PowerShell `-File` 调用，不拼接不受信文本。
 
 audit 模式不启动实现或修复。审计报告可以包含被审对象的 high/blocker 发现；报告本身是否完成由验收覆盖、证据与独立复核决定，不能将 accepted_local 理解成被审软件无缺陷。develop 模式有 high/blocker 则不能验收。
 
 ## 模型路由
 
-`.pdw/config.json` 中的 roles 为 `scan / test-plan / implement / review / planner`。每项有 backend、executable、model；可选 args 只用于受信 CLI 启动前缀，不能传跳过权限参数。
+`.pdw/config.json` 中的 roles 为 `scan / test-plan / implement / review / planner`。每项有 backend、executable、model；可选 args 只用于受信 CLI 启动前缀。程序拒绝前缀中的改工作根/扩展可写目录（如 -C、--cd、--add-dir）、覆盖权限/沙箱/config/model 等保留参数；应使用结构化角色字段。配置与 executable 仍是受信输入，这些检查不是恶意配置隔离。
 
 init 仅从现有 OpenCode 配置中的 model/provider.models 标识选择 DeepSeek V4.1 Flash，不复制配置或密钥。当前机器识别到的是 `workbuddy/deepseek-v4.1-flash`；这不证明它的费用最便宜。若没有识别到，要求协调者从实际模型列表填写，不能静默使用昂贵默认模型。Codex/AGY 默认沿用宿主模型，可在项目配置显式指定。
 
@@ -98,7 +102,13 @@ ponytail: 当前程序保持固定阶段及禁止嵌套调度，不增加通用�
 
 角色 stdout/stderr、最终结构化结果与机器检查分别保存。检查退出码非零不能被 Agent 的 pass 覆盖；复核必须列出所有验收 ID、pass 状态和具体证据。修复后重跑检查和独立复核，最多一次。
 
-源码指纹在 Git 项目使用 tracked/untracked 非 ignored 文件；非 Git 项目遍历文件。忽略 `.git/.pdw/node_modules/.next/.turbo/__pycache__`。这可以检测源码漂移与越界修改，不是沙箱、内容签名或抗恶意同用户进程的安全隔离。大型含二进制数据的目录先配置合理的 Git ignore，不把数据仓整目录当轻量开发任务。
+输出解析仅接受完整角色 JSON、最新的 `type: text` 完整文本或 `type: result` 最终结果封套；不拼接未知增量协议、不从工具参数取验收结果，也不在末条响应无效时回退旧 verdict。Codex 的专用最终文件存在时以该文件为准，无效则失败；正文或代码围栏可包裹完整 JSON。其他输出协议须单独适配并做真实小任务验证。
+
+源码指纹在普通 Git 项目使用 tracked/untracked 非 ignored 文件，并额外遍历显式任务 scope；scope 落在忽略规则下时，覆盖其最上层被忽略的祖先及同目录源文件，以便检测越界兄弟文件。项目根被 Git 忽略、Git 文件列表为空、scope 为整个项目或非 Git 项目时改用文件系统遍历，不能静默接受空的 Git 列表。status/handoff 的 snapshot_coverage 给出覆盖方式、文件数、强制覆盖根与保留排除目录。
+
+始终排除 `.git/.pdw/node_modules/.next/.turbo/__pycache__`，这些目录不能声明为任务 scope；显式 scope 的链接路径被拒绝，遍历中的其他符号链接只记录链接指向、不跟随其目标。无法读取的范围会报错，不能当成已覆盖。普通 Git 模式下，未声明的其他 Git ignored 文件仍不在覆盖范围。范围检测不是沙箱、内容签名或抗恶意同用户进程的隔离；大型目录应缩小任务 scope，不能只靠 Git ignore 隐藏需要监测的代码。
+
+运行中出现快照错误时停止并保留失败报告、交接和预算，活动进程退出后释放锁。交接明确显示 snapshot_coverage.source=unavailable、file_count=null、changes_known=false、accepted_current=false；差异记录为 null，不把“无法确定”写成“没有改动”。
 
 同项目单协调者通过原子目录锁实现；释放时把锁记录移动到 lock-history，保留证据，不永久删除。崩溃后若记录中的子进程仍存活，resume 会拒绝清零；需核对进程后处理。没有跨机器分布式锁。
 
@@ -110,6 +120,7 @@ Codex 使用原生 read-only/workspace-write 沙箱；OC 使用 plan/build agent
 
 ```powershell
 node <本Skill>/scripts/pdw.test.mjs
+node --test <本Skill>/scripts/drivers.test.mjs
 ```
 
-它创建并保留隔离用例、启动真实本地子进程，用 fixture CLI 测试完成条件、检查失败、定向修复、越界、只读违规、输出解析、漂移、预算、进程超时、并发锁、取消与恢复。**该套件验证编排逻辑，真实 OC/Codex/AGY 需要另外的 live task。** 测试报告和夹具保存在项目 `.pdw/test-runs/`，没有自动清理。
+它创建并保留隔离用例、启动真实本地子进程，用 fixture CLI 测试完成条件、检查失败、定向修复、越界、只读违规、输出解析、漂移、预算、进程超时、并发锁、取消与恢复，并覆盖被父仓库忽略的夹具根、项目 Git ignore 与 info/exclude 隐藏的显式范围。驱动测试另验证 Windows Codex npm 布局、中文路径与参数边界。**这些套件验证编排/发现逻辑，真实 OC/Codex/AGY 的登录和路由需要另外的 live task。** 夹具保存在项目 `.pdw/test-runs/`，没有自动清理。
