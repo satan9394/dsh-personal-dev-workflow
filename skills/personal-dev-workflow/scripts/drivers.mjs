@@ -70,6 +70,52 @@ export function invocation(profile, role, files) {
   throw new Error(`Unsupported backend: ${profile.backend}`);
 }
 
+// A role often writes prose around its JSON, wraps it in a fenced block, and
+// sometimes emits more than one fenced block (the last one is not always the
+// answer). Extract every plausible JSON value; validation below is unchanged, so
+// a value still has to look exactly like a role result to be accepted.
+function jsonValues(candidate) {
+  if (candidate && typeof candidate === 'object') return [candidate];
+  if (typeof candidate !== 'string') return [];
+  const text = candidate.trim();
+  if (!text) return [];
+  // A payload that is already JSON is taken at face value. Digging into it would
+  // resurrect unrelated nested objects (for example a tool-call argument that
+  // happens to look like a role result), which the stream must never accept.
+  try { return [JSON.parse(text)]; } catch { /* prose around the JSON */ }
+  const bodies = [];
+  for (const block of [...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)].reverse()) bodies.push(block[1]);
+  bodies.push(text);
+  for (const span of balancedSpans(text)) bodies.push(text.slice(span[0], span[1]));
+  const values = [];
+  for (const body of bodies) {
+    try { values.push(JSON.parse(body.trim())); } catch { /* not JSON on its own */ }
+  }
+  return values;
+}
+
+// Offsets of balanced {...} objects, later objects first, ignoring braces inside strings.
+function balancedSpans(text) {
+  const spans = [];
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== '{') continue;
+    let depth = 0, inString = false, escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { spans.push([start, i + 1]); break; } }
+    }
+  }
+  return spans.reverse();
+}
+
 export function parseResult(stdout, finalFile) {
   const candidates = [];
   if (finalFile && fs.existsSync(finalFile)) candidates.push(fs.readFileSync(finalFile, 'utf8'));
@@ -89,24 +135,19 @@ export function parseResult(stdout, finalFile) {
   if (fragments.length) candidates.push(...fragments, fragments.join(''));
   candidates.push(stdout.trim());
   for (let candidate of candidates.reverse()) {
-    try {
-      if (typeof candidate === 'string') {
-        let text = candidate.trim();
-        const blocks = [...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)];
-        const last = blocks.at(-1);
-        if (last && !text.slice(last.index + last[0].length).trim()) text = last[1];
-        candidate = JSON.parse(text);
-      }
-      if (!candidate || !['pass', 'fail', 'blocked'].includes(candidate.verdict) || typeof candidate.summary !== 'string' || !candidate.summary.trim()) continue;
-      if (!Array.isArray(candidate.findings) || !Array.isArray(candidate.acceptance)) continue;
-      for (const finding of candidate.findings) {
-        if (!finding.id || !['low', 'medium', 'high', 'blocker'].includes(finding.severity) || !finding.description || !finding.evidence) throw new Error('Malformed finding');
-      }
-      for (const item of candidate.acceptance) {
-        if (!item.id || !['pass', 'fail', 'not_run'].includes(item.status) || typeof item.evidence !== 'string') throw new Error('Malformed acceptance result');
-      }
-      return candidate;
-    } catch { /* Missing/invalid structured output must fail closed below. */ }
+    for (const value of jsonValues(candidate)) {
+      try {
+        if (!value || !['pass', 'fail', 'blocked'].includes(value.verdict) || typeof value.summary !== 'string' || !value.summary.trim()) continue;
+        if (!Array.isArray(value.findings) || !Array.isArray(value.acceptance)) continue;
+        for (const finding of value.findings) {
+          if (!finding.id || !['low', 'medium', 'high', 'blocker'].includes(finding.severity) || !finding.description || !finding.evidence) throw new Error('Malformed finding');
+        }
+        for (const item of value.acceptance) {
+          if (!item.id || !['pass', 'fail', 'not_run'].includes(item.status) || typeof item.evidence !== 'string') throw new Error('Malformed acceptance result');
+        }
+        return value;
+      } catch { /* Missing/invalid structured output must fail closed below. */ }
+    }
   }
   throw new Error('No valid final JSON response; inspect stdout.log/stderr.log. A zero CLI exit is not an acceptance pass.');
 }
