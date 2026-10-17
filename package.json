@@ -1,16 +1,16 @@
 {
-  "name": "@satan9394/dsh-personal-dev-workflow",
+  "name": "@satan9394/personal-dev-workflow",
   "version": "2.0.1",
   "description": "Executable personal development workflow skill for coding agents: a single coordinator compiles the user's goal into a task contract, dispatches isolated role sessions across OpenCode/Codex/AGY, runs real checks, reviews independently, and resumes from recorded evidence. Ships a dependency-free Node CLI relay (scripts/pdw.mjs).",
   "license": "MIT",
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/satan9394/dsh-personal-dev-workflow.git"
+    "url": "git+https://github.com/satan9394/personal-dev-workflow.git"
   },
-  "homepage": "https://github.com/satan9394/dsh-personal-dev-workflow#readme",
+  "homepage": "https://github.com/satan9394/personal-dev-workflow#readme",
   "bugs": {
-    "url": "https://github.com/satan9394/dsh-personal-dev-workflow/issues"
+    "url": "https://github.com/satan9394/personal-dev-workflow/issues"
   },
   "keywords": [
     "agent-skills",

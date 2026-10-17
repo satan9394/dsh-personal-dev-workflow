@@ -48,7 +48,7 @@ gh release create v1.0.1 --generate-notes --notes-start-tag v1.0.0 --title "v1.0
 
 ## Scope and current limitations
 
-- **A release here means a GitHub tag + Release** (and the install path `npx skills add satan9394/dsh-personal-dev-workflow`).
+- **A release here means a GitHub tag + Release** (and the install path `npx skills add satan9394/personal-dev-workflow`).
 - **No npm publishing.** The package workflow (`publish-package.yml`) and the `publishConfig` registry entry were removed on 2026-10-16 on the user's instruction — this repository ships the Skill only, and nothing is published to npm or GitHub Packages.
 - Do the release from a machine whose git identity is `satan9394 <satan9394@users.noreply.github.com>`
   so no personal email lands in commit metadata.

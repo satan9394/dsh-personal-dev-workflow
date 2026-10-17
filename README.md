@@ -59,7 +59,7 @@ Skill maintenance/distribution home; see [the import record](archive/docs/eviden
 ## Install
 
 ```sh
-npx skills add satan9394/dsh-personal-dev-workflow
+npx skills add satan9394/personal-dev-workflow
 ```
 
 | Way | Command / path |
@@ -164,7 +164,7 @@ This repo practices what the skill preaches:
 - CI additionally runs the **official Agent Skills validator** (`skills-ref validate`) pinned to an
   immutable commit, on a runner with `PYTHONUTF8=1` because that validator reads files with the platform
   default encoding.
-- `npx skills add satan9394/dsh-personal-dev-workflow --list` must discover the skill.
+- `npx skills add satan9394/personal-dev-workflow --list` must discover the skill.
 - v1.0.0 was exercised end-to-end on real projects (a task-card CLI, and a three-run bounded-autonomy
   test under the v0.5.x model): [`archive/docs/case-study-bounded-autonomy.md`](archive/docs/case-study-bounded-autonomy.md)
   · runnable evidence: [`archive/docs/evidence/runstate-cli/`](archive/docs/evidence/runstate-cli/).
@@ -193,7 +193,7 @@ MIT.
 跑真实检查、独立复核，并按落盘证据恢复。安装：
 
 ```sh
-npx skills add satan9394/dsh-personal-dev-workflow
+npx skills add satan9394/personal-dev-workflow
 ```
 
 或把 `skills/personal-dev-workflow/` 复制到项目 `.agents/skills/`（Codex / OpenCode / DSH / Antigravity）

@@ -18,7 +18,7 @@
 - 原位置 `E:\DeepSeek_Harness\workspace\2026_09_06\release\dsh-personal-dev-workflow`（DSH 日期工作区）。
 - 2026-10-16 迁到 `E:\Code_file\Projects\dsh-personal-dev-workflow`；2026-10-17 目录改名为 **`personal-dev-workflow`**（用户手动完成，因为顶层目录被进程当 CWD 锁住）。
 - 活引用已全部改到新路径：`~/.dsh/profiles/web/cordis.patch.yml` 的 controller、`E:\Code_file\Claude_code\PROJECTS.md` 第 08 行、`E:\DeepSeek_Harness\workspace\2026_09_06\AGENTS.md`（墓碑）、本仓库的 `HANDOFF-20261016-opencode.md`、skills-manager 的本地源 `source_ref`。
-- 注意：**GitHub 仓库名 / npm 包名仍是 `dsh-personal-dev-workflow`**（未改，见第 5 节）。
+- 注意：**GitHub 仓库名已于 2026-10-17 晚改为 `personal-dev-workflow`**（`gh repo rename`，旧地址保留跳转；本地 `origin` 已 `set-url` 到新地址），`package.json` 的 `name` 同步改为 `@satan9394/personal-dev-workflow`。npm 侧见第 5 节第 6 条。
 
 ### 2.2 v2.0.0 发布（旧线，已完成）
 
@@ -67,6 +67,7 @@
 - 三份项目副本升到 8 文件当前版；`remote-job-aggregator` 首次装入（`.agents/skills/` + `pdw.ps1` + `AGENTS.md`）。
 - 修了两个项目里失效的 codex 路径（`...\Codex\bin\e78bad9887fa50cf\codex.exe` → `...\896a0166b774037a\codex.exe`），两处 `doctor` 由 exit 1 变 exit 0；六个"现行描述"文件的版本串改到 `1.3.2-local`（历史记录不动）。
 - `DECISIONS.md`：新增 **D-0082**（本条专项的执行细则）；**D-0078 撞号已修**（cc-switch 那条重编为 **D-0083**）。
+- **推送与改名（同日更晚）**：`67b13ca`（`build!`）+ `c22965e`（`docs`）推送到 `origin/main`，CI run `39038915821` success；随后 `gh repo rename` 把远端改成 **`satan9394/personal-dev-workflow`**（旧地址保留跳转），本地 `origin` 已 `set-url`，`package.json` 的 `name`（→ `@satan9394/personal-dev-workflow`）与三处 URL、README / RELEASING / SECURITY 的安装路径同步到新名。**未发版本**（无 tag、无 Release、无 npm publish）。
 - 🔴 **最值钱的教训**：PDW 的 `snapshot()` 把**全部 git 可见的未跟踪文件**算进任务指纹（与 scope 无关）。给 `remote-job-aggregator`（`.agents/` 未被忽略、且尚无任何 commit）首次装入后，那 10 个新文件**改掉了该仓库每一个既有任务的指纹**；补 `.git/info/exclude` 只能救回"baseline 之后无真实改动"的任务（实测 3 个里 1 个）。**以后给项目装/升级 skill 前，先确认 `.agents/`、`AGENTS.md`、`pdw.ps1` 已被忽略或已提交。**
 
 ## 3. 当前精确状态
@@ -133,7 +134,8 @@ git commit -m "build!: ship the Skill only — drop plugin bundle, generated cop
 3. ~~Antigravity 未挂载~~ **已完成（2026-10-17）**：已 `skills deploy --agent antigravity`。**客户端层仍未实测**（用户决定本轮不测，属已知未验项，不是已验证）。
 4. **`.pdw/` 噪音**：现约 9819 文件 / 11.2 MB，含**悬空 Junction**（`symlink-scope/dangling` 等）。清洗建议：只清悬空链接、按需裁剪 `test-runs/`（规则要求保留 `.pdw/` 证据）。
 5. ~~`DECISIONS.md` 的 D-0078 撞号~~ **已完成（2026-10-17）**：cc-switch 删卡那条重编为 `D-0083`（Star 库收窄那条保持 `D-0078`——四份全局规则引用的就是它），并改了 `NOTES_20261015.md:172` 的指针。
-6. **GitHub / npm 名字**仍是 `dsh-personal-dev-workflow`：本次只改了本地目录名。若要连远端仓库名一起改，用 `gh repo rename`（旧地址会保留跳转，但引用要再扫一轮）。
+6. ~~GitHub / npm 名字~~ **仓库名已改（2026-10-17 晚）**：`gh repo rename` 把远端改成 `satan9394/personal-dev-workflow`（旧地址保留跳转），本地 `origin` 已 `set-url`；`package.json` 的 `name`（→ `@satan9394/personal-dev-workflow`）与三处 URL、README / RELEASING / SECURITY 里的安装路径（→ `npx skills add satan9394/personal-dev-workflow`）均已同步。
+   **npm 侧另说**：`registry.npmjs.org` 上从来没有过该包（`npm view` 双双 404）；历史发布工作流 `.github/workflows/publish-package.yml`（已于 2026-10-16 移除，见 `67b13ca^`）指向的是 **GitHub Packages**（`registry-url: https://npm.pkg.github.com`、`scope: @satan9394`），所以若曾有产物，它在那里。查/删需要 token 具备 `read:packages`（列表）与 `delete:packages`（删除）——当前 `gh` 凭据没有这两个 scope（`gh api /users/satan9394/packages` 返回 403；`npm view --registry=https://npm.pkg.github.com` 返回 401）。授予后可用 `gh auth refresh -s read:packages,delete:packages`，或在 GitHub 网页 `https://github.com/users/satan9394/packages/npm/dsh-personal-dev-workflow/settings` 直接删。
 7. **两个被中断的 PDW 任务**（都在 Target 项目 `E:\Code_file\Claude_code\projects\remote-job-aggregator`）：
    - `7540`：排查改名阻塞时被直接杀掉的 `pdw.mjs run …`。
    - `20261017071242-3b909d`：用 `pdw.mjs cancel` 干净取消的。

@@ -1,6 +1,6 @@
 # 安全策略 / Security Policy
 
-本文件说明 `dsh-personal-dev-workflow` 的漏洞上报渠道与披露政策。
+本文件说明 `personal-dev-workflow` 的漏洞上报渠道与披露政策。
 
 ## 支持的版本
 
