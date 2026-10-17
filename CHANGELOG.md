@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
+## [2.0.1] — 2026-10-16 — Research 1.3.2 guard repairs and Skill normalization
+
+### Fixed
+- Import research Skill 1.3.2-local: ignored-root/empty-Git and explicit ignored-scope coverage,
+  canonical paths, failed-snapshot reporting, truthful doctor flags, Windows npm Codex native
+  discovery, reserved CLI prefix rejection and consistent runtime versions.
+- Retain the committed role-JSON recovery fix (`0e06aea`) and add malformed/embedded-output regressions.
+- Prevent nested tool data and earlier draft verdicts from overriding the final response; treat a
+  dedicated final file as authoritative and reject it when malformed.
+- Require complete final text events; unknown delta streams need an explicit protocol adapter.
+- Keep test evidence inside this repository in its canonical layout and in installed layouts.
+- Strip Markdown fragments when validating local reference targets.
+
+### Changed
+- Follow current skill-creator: frontmatter only name/description; display metadata in agents/;
+  runtime/reference/assets separation; no repository release notes or temporary backups in Skill.
+- Keep distribution 2.0.1 separate from research/runtime 1.3.2-local using `pdwSkillVersion`.
+- Regenerate plugin and SkillHub copies, update contributor/release guidance and CI gates.
+- Preserve the pre-existing untracked backup under ignored `.pdw/migrations/research-1.3.2/`.
+
+### Boundaries / upgrade
+- This is a local preparation, not a published release. Preserve existing task state/evidence/budgets;
+  same-name installation still refuses overwrite and migration remains manual.
+- Doctor does not prove authentication/provider routing; no money/token ceiling or DSH/CC automatic backend.
+
 ## [2.0.0] — 2026-10-16 — Executable relay: one coordinator, CLI-dispatched role sessions
 
 v2.0.0 replaces the skill body with the line developed in the author's PDW research project (shipped there as

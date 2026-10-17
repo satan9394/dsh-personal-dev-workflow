@@ -16,6 +16,8 @@ dsh plugin --profile web add link:<本仓库路径>
 
 > 只想在单个工作区试用？把 `skills/personal-dev-workflow/` 直接放入该工作区的 `.dsh/skills/` 即可（自动发现，无需安装）。
 
+DSH 在这里是 Skill 的加载/协调宿主；运行器自动后端仍只有 OC、Codex、AGY。doctor 不验证登录与真实模型路由。
+
 ## 使用
 
 对 agent 说"用 PDW 在 <项目> 完成 <目标>"，或"开工 / 实现这个功能 / 修这个 bug"，
@@ -32,11 +34,11 @@ dsh-personal-dev-workflow/
 ├── cordis.patch.yml   # bundle patch 层
 ├── package.json       # dsh.bundle manifest
 └── skills/personal-dev-workflow/
-    ├── SKILL.md                  # v2.0.0 主文件（73 行）
+    ├── SKILL.md                  # 研究版 1.3.2-local 主文件；分发版 2.0.1
     ├── references/runtime.md     # 契约字段、CLI 用法、扩展边界
     ├── agents/openai.yaml        # Codex 侧展示信息
     ├── assets/audit-task.json    # 只读审查契约样例
-    └── scripts/                  # pdw.mjs（CLI 接力）+ drivers.mjs + pdw.test.mjs
+    └── scripts/                  # pdw.mjs（CLI 接力）+ drivers.mjs + pdw.test.mjs + drivers.test.mjs
 ```
 
 v1.0.0 时代的 skill（六步任务卡循环 + `runstate.js` 控制器 + evals + 适配器文档）不再随 skill

@@ -1,7 +1,7 @@
 # Personal Dev Workflow
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![version](https://img.shields.io/badge/version-2.0.0-informational)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.0.1-informational)](CHANGELOG.md)
 [![agents](https://img.shields.io/badge/agents-OpenCode%20%7C%20Codex%20%7C%20AGY-8a2be2)](#install)
 
 > **One coordinator compiles your goal into a task contract; isolated role sessions do the work.**
@@ -17,10 +17,27 @@ targeted repair, and keeps every raw log. Cost routing is explicit: OpenCode + D
 scanning and verification prep, Codex for implementation, an independent session for review, AGY for
 planning when a task needs it.
 
+## Current version: 2.0.1
+
+This working tree prepares 2.0.1 locally; remote installation still follows the published Git state.
+
+The distribution now imports research Skill **1.3.2-local**, retaining the committed role-JSON recovery
+fix from `0e06aea`. Distribution versions (`package.json` and the plugin manifest) remain on the 2.x
+line; `pdwSkillVersion` records the research/runtime version without adding fields to Skill frontmatter.
+
+This update fixes ignored-root and explicit ignored-scope snapshots, truthful doctor model flags,
+Windows npm Codex native discovery, unsafe CLI prefixes and failed-coverage finalization. Coverage
+is visible in status/handoff; it remains post-run detection, not a filesystem sandbox. Doctor checks
+binary/configuration readiness; authentication and provider routing require a small real task.
+Upgrades and old-state migration remain manual; retain task evidence and used budgets.
+
+Research and original experiments live in the separate research project. This repository is the
+Skill maintenance/distribution home; see [the import record](docs/evidence/research-1.3.2-import.json).
+
 ## What v2.0.0 changes
 
 1. **The skill becomes executable.** The program — not the prose — freezes the contract, dispatches
-   roles, runs checks and records evidence. `SKILL.md` (73 lines, zh-CN) only tells the coordinator how
+   roles, runs checks and records evidence. `SKILL.md` (zh-CN) only tells the coordinator how
    to drive it.
 2. **One skill instead of the en/zh pair.** v1.0.0 shipped `personal-dev-workflow` (English) *and*
    `personal-dev-workflow-zh`; v2.0.0 ships a single skill named `personal-dev-workflow` whose body is
@@ -59,7 +76,7 @@ coordinator writes the contract for you. You never hand-write JSON.
 
 ```sh
 node <skill>/scripts/pdw.mjs init     --project <project>   # .pdw/config.json + .gitignore entry
-node <skill>/scripts/pdw.mjs doctor   --project <project>   # executables, versions, low-cost models
+node <skill>/scripts/pdw.mjs doctor   --project <project>   # executables, versions, configuration; not authentication
 node <skill>/scripts/pdw.mjs new      --from contract.json --project <project>
 node <skill>/scripts/pdw.mjs plan     <id>                  # roles, models, checks, limits — no model call
 node <skill>/scripts/pdw.mjs run      <id>                  # two read-only scans in parallel, then serial
@@ -93,7 +110,7 @@ Minimal contract (fields are documented in [`references/runtime.md`](skills/pers
 - **No self-approval**: the reviewer's context is separate from the implementer's, and it reports per
   acceptance ID. `develop` cannot be accepted with an open high/blocker finding; an `audit` run reports
   findings *about* its subject and its own completion is judged by coverage and evidence.
-- **Source fingerprints** (Git tracked/untracked non-ignored files) detect drift and out-of-scope edits.
+- **Source fingerprints** cover Git tracked/untracked files plus explicit ignored scope; ignored roots or empty Git lists use filesystem snapshots. They detect drift and out-of-scope edits within reported coverage.
   They are a detector, **not** a sandbox, a content signature or a defence against a hostile same-user
   process.
 - **Unknown stays unknown**: unverifiable coverage (browser, real provider settings, server-side billing
@@ -105,9 +122,9 @@ Minimal contract (fields are documented in [`references/runtime.md`](skills/pers
 
 ```
 dsh-personal-dev-workflow/
-├── skills/personal-dev-workflow/      # THE skill (v2.0.0): SKILL.md + references/runtime.md
+├── skills/personal-dev-workflow/      # THE skill (research 1.3.2-local): SKILL.md + references/runtime.md
 │                                      #   + agents/openai.yaml + assets/audit-task.json
-│                                      #   + scripts/{pdw.mjs, drivers.mjs, pdw.test.mjs}
+│                                      #   + scripts/{pdw.mjs, drivers.mjs, pdw.test.mjs, drivers.test.mjs}
 ├── plugin/dsh-personal-dev-workflow/  # DSH bundle plugin — bundles the skill above (generated copy)
 ├── dist/skillhub-pkg/                 # flat publish package for SkillHub (generated copy)
 ├── scripts/validate-skills.mjs        # frontmatter + reference + copy + version-consistency checks
@@ -118,7 +135,7 @@ dsh-personal-dev-workflow/
 ```
 
 `skills/` is the single source of truth; the plugin bundle and the `dist/` package are **generated
-copies** and a CI check fails on any byte difference. Run `npm run sync` after editing the skill.
+copies** and a CI check fails on any byte difference. Run `node scripts/sync-copies.mjs` after editing the skill.
 
 ## Legacy lines (kept deliberately)
 
@@ -137,21 +154,17 @@ rather than described from memory.
 
 This repo practices what the skill preaches:
 
-- `npm run validate` — each canonical `SKILL.md` has valid frontmatter (`name` matches its folder,
-  `metadata.version` is a string scalar, no YAML flow collections, top-level keys limited to
-  name/description/license/compatibility/metadata/allowed-tools), every `references/...` target in the
-  body exists, every packaged copy is byte-identical to `skills/`, and `metadata.version`,
-  `plugin/dsh-personal-dev-workflow/package.json` and the root `package.json` all declare **2.0.0**.
-- `npm run test:pdw` — the skill's own suite (`20` cases): it spawns fixture CLIs as real local
-  processes and covers completion conditions, failing checks, one-shot repair, out-of-scope writes,
-  read-only violations, output parsing, drift, budgets, process timeout, the concurrency lock, cancel
-  and resume. **It validates the orchestration logic; real OpenCode/Codex/AGY runs need separate live
-  tasks.** Evidence is kept under `<project>/.pdw/test-runs/` and is never auto-deleted. Note the suite
-  resolves `<project>` from its own location (`<project>/.agents/skills/personal-dev-workflow/scripts`), so
-  running it **from this repository** writes its evidence to the repository's *parent* directory
-  (`<repo>/../.pdw/`) rather than into the checkout.
-- `npm run test:runstate` — the v0.5.x Markdown controller's black-box suite (43 cases; conditionally
-  skipped cases print `SKIP` and do not count as passes).
+- `node scripts/validate-skills.mjs` — name/description-only frontmatter, existing references,
+  research version mapping, matching distribution manifests, and byte-identical generated copies.
+- `node --test scripts/validate-skills.test.mjs` — real validator fixtures for valid packaging,
+  rejected metadata/version drift, fragment links and stale copies.
+- `node --test skills/personal-dev-workflow/scripts/drivers.test.mjs` — native discovery, profile
+  policies and the retained role-JSON recovery patch, including malformed-output rejection.
+- `node skills/personal-dev-workflow/scripts/pdw.test.mjs` — 32 fixture orchestration cases,
+  including ignored Git roots/scope, evidence freshness, budgets, locks, cancellation and failure
+  reporting. Evidence stays in this checkout's `.pdw/test-runs/` (or the installed project's `.pdw/`).
+  These are real local fixture processes, not live provider verification.
+- `node tools/run-tests.mjs` — the retained v0.5.x controller suite; skipped cases remain explicit.
 - CI additionally runs the **official Agent Skills validator** (`skills-ref validate`) pinned to an
   immutable commit, on a runner with `PYTHONUTF8=1` because that validator reads files with the platform
   default encoding.

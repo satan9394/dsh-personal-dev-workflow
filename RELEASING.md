@@ -23,19 +23,22 @@ impact or migration.
 ## Versioning
 
 - Follow [SemVer](https://semver.org/).
-- Keep `package.json` `version` and both `skills/*/SKILL.md` `version` fields in sync.
+- Keep root and plugin `package.json.version` in sync. Record the imported research version in root `pdwSkillVersion`; it must match the Skill body/runtime. Frontmatter contains only name/description.
 - `scripts/validate-skills.mjs` enforces that consistency; its failure blocks the release.
 
 ## Steps
 
 ```sh
 # 0. pick the new version, e.g. VERSION=1.0.1
-# 1. update package.json + both skills/*/SKILL.md versions, regenerate packaged copies
-npm run sync          # scripts/sync-copies.mjs
+# 1. update distribution manifests; update pdwSkillVersion only when importing a new research runtime
+node scripts/sync-copies.mjs          # scripts/sync-copies.mjs
 # 2. add the CHANGELOG.md entry
 # 3. verify locally
-npm run test:runstate
-npm run validate
+node scripts/validate-skills.mjs
+node --test scripts/validate-skills.test.mjs
+node --test skills/personal-dev-workflow/scripts/drivers.test.mjs
+node skills/personal-dev-workflow/scripts/pdw.test.mjs
+node tools/run-tests.mjs
 # 4. commit, then tag and push
 git commit -am "release: v1.0.1"
 git tag v1.0.1
